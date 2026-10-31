@@ -53,6 +53,12 @@ class Enquiry(models.Model):
     priority = models.PositiveSmallIntegerField(default=0)  # 0 to 3 stars
     expected_close_date = models.DateField(null=True, blank=True)  # when we expect the couple to decide
     lost_reason = models.CharField(max_length=12, choices=LostReason.choices, blank=True)
+    # filled in by the couple themselves on the customer website (see the portal app)
+    partner_name = models.CharField(max_length=120, blank=True)
+    functions_wanted = models.JSONField(default=list, blank=True)  # ["MEHENDI", "SANGEET", ...]
+    services_needed = models.JSONField(default=list, blank=True)  # ["CATERING", "DECOR", ...]
+    preferred_contact = models.CharField(max_length=10, blank=True)  # CALL, WHATSAPP or EMAIL
+    profile_complete = models.BooleanField(default=False)
     client = models.ForeignKey("clients.Client", null=True, blank=True, on_delete=models.SET_NULL,
                                related_name="enquiries")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,

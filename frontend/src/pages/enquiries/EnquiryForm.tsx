@@ -11,7 +11,7 @@ import { paiseToRupees, rupeesToPaise } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
 import { FollowUps } from './FollowUps'
 import { StarRating } from './StarRating'
-import { LOST_REASONS, SOURCES, STAGE_WIN_CHANCE, STATUSES, type Enquiry, type Status } from './types'
+import { CONTACT_LABELS, LOST_REASONS, SOURCES, STAGE_WIN_CHANCE, STATUSES, WEBSITE_FUNCTIONS, WEBSITE_SERVICES, type Enquiry, type Status } from './types'
 
 const schema = z.object({
   couple_name: z.string().min(1, 'Enter the couple’s name'),
@@ -203,6 +203,23 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
           <p role="status" className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">
             {message}
           </p>
+        )}
+
+        {enquiry && enquiry.source === 'WEBSITE' && (
+          <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-3 text-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-semibold text-slate-700">From the customer website</span>
+              <span className={enquiry.profile_complete ? 'text-xs font-medium text-emerald-600' : 'text-xs font-medium text-amber-600'}>
+                {enquiry.profile_complete ? 'Profile complete' : 'Profile not finished'}
+              </span>
+            </div>
+            <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              <div><dt className="text-xs text-slate-500">Partner</dt><dd>{enquiry.partner_name || '-'}</dd></div>
+              <div><dt className="text-xs text-slate-500">Prefers to be contacted by</dt><dd>{CONTACT_LABELS[enquiry.preferred_contact] ?? '-'}</dd></div>
+              <div><dt className="text-xs text-slate-500">Functions wanted</dt><dd>{enquiry.functions_wanted.map((c) => WEBSITE_FUNCTIONS[c] ?? c).join(', ') || '-'}</dd></div>
+              <div><dt className="text-xs text-slate-500">Needs help with</dt><dd>{enquiry.services_needed.map((c) => WEBSITE_SERVICES[c] ?? c).join(', ') || '-'}</dd></div>
+            </dl>
+          </div>
         )}
 
         {enquiry && <FollowUps enquiryId={enquiry.id} canEdit={canEdit} />}

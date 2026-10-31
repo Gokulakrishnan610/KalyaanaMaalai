@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ivory: #fffaf4;
+  --color-blush: #fbeee9;
+  --color-maroon-50: #fdf1f4;
+  --color-maroon-100: #f9dde4;
+  --color-maroon-500: #a82a52;
+  --color-maroon-600: #8f1d3f;
+  --color-maroon-700: #721632;
+  --color-maroon-900: #3a0b19;
+  --color-gold-400: #d9b45f;
+  --color-gold-500: #c9a24b;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+}
+
+html,
+body {
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+#root > * {
+  flex: 1 0 auto;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-ivory text-stone-800 antialiased;
+}
+
+/* the slider's slow zoom on the photo */
+@keyframes slow-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+.slow-zoom {
+  animation: slow-zoom 9s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .slow-zoom { animation: none; }
+  html { scroll-behavior: auto; }
+}
