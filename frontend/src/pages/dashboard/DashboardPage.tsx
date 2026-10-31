@@ -31,6 +31,9 @@ import { sourceInfo, type Source } from '@/pages/enquiries/types'
 
 interface Summary {
   active_enquiries: number
+  open_incidents: number
+  critical_incidents: number
+  recent_incidents: { id: number; title: string; wedding_title: string; severity: string; status: string; assigned_to_name: string }[]
   overdue_follow_ups: number
   pipeline_expected_paise: number
   upcoming_follow_ups: { id: number; enquiry_id: number; couple_name: string; kind: string; summary: string; due_at: string; overdue: boolean }[]
@@ -143,6 +146,12 @@ export default function DashboardPage() {
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {data.late_vendors_today} vendor{data.late_vendors_today > 1 ? 's are' : ' is'} running late today.
         </div>
+      )}
+
+      {data.critical_incidents > 0 && (
+        <Link to="/incidents" role="alert" className="block rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {data.critical_incidents} serious incident{data.critical_incidents > 1 ? 's need' : ' needs'} attention. Open incidents →
+        </Link>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -286,6 +295,29 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 xl:grid-cols-3">
       <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <CardTitle className="mb-0 text-base">Open incidents</CardTitle>
+          <Link to="/incidents" className="text-xs font-medium text-brand-600 hover:underline">View all</Link>
+        </div>
+        {data.recent_incidents.length === 0 ? (
+          <p className="text-sm text-slate-500">All clear. Nothing is open.</p>
+        ) : (
+          <ul className="space-y-3 text-sm">
+            {data.recent_incidents.map((i) => (
+              <li key={i.id}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{i.title}</span>
+                  <Badge tone={i.severity === 'CRITICAL' ? 'red' : i.severity === 'HIGH' ? 'brand' : 'amber'}>{i.severity.toLowerCase()}</Badge>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {i.wedding_title} · {i.assigned_to_name ? `with ${i.assigned_to_name}` : 'not assigned yet'}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card>
         <CardTitle className="text-base">Upcoming consultations</CardTitle>
         {data.upcoming_consultations.length === 0 ? (
           <p className="text-sm text-slate-500">None booked.</p>
@@ -300,7 +332,7 @@ export default function DashboardPage() {
           </ul>
         )}
       </Card>
-      <Card className="xl:col-span-2">
+      <Card>
         <CardTitle className="text-base">Vendor payments due this week</CardTitle>
         {data.upcoming_vendor_payments.length === 0 ? (
           <p className="text-sm text-slate-500">Nothing due in the next 7 days.</p>

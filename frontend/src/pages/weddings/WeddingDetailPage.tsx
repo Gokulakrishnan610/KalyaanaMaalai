@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { get } from '@/api/client'
 import { Badge, cn, ErrorState, Spinner } from '@/components/common'
 import { formatDate } from '@/helpers/date'
+import { IncidentsList } from '@/pages/incidents/IncidentsList'
 import { EventDayTab } from './EventDayTab'
 import { FunctionsTab } from './FunctionsTab'
 import { GuardedFinanceTab, GuardedVendorsTab } from './Guarded'
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'vendors', label: 'Vendors' },
   { id: 'finance', label: 'Finance' },
   { id: 'eventday', label: 'Event Day' },
+  { id: 'incidents', label: 'Incidents' },
 ]
 
 export default function WeddingDetailPage() {
@@ -76,6 +78,7 @@ export default function WeddingDetailPage() {
       {tab === 'vendors' && <GuardedVendorsTab weddingId={wedding.id} />}
       {tab === 'finance' && <GuardedFinanceTab weddingId={wedding.id} />}
       {tab === 'eventday' && <EventDayTab wedding={wedding} />}
+      {tab === 'incidents' && <IncidentsList weddingId={wedding.id} />}
     </div>
   )
 }

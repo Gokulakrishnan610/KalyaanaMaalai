@@ -6,6 +6,7 @@ import ClientPage from '@/pages/clients/ClientPage'
 import ClientsPage from '@/pages/clients/ClientsPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import EnquiriesPage from '@/pages/enquiries/EnquiriesPage'
+import IncidentsPage from '@/pages/incidents/IncidentsPage'
 import LoginPage from '@/pages/login/LoginPage'
 import NotificationsPage from '@/pages/notifications/NotificationsPage'
 import PaymentsPage from '@/pages/payments/PaymentsPage'
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="vendors/:id" element={<VendorProfilePage />} />
             <Route path="quotations" element={<QuotationsPage />} />
             <Route path="quotations/:id" element={<RequestDetailPage />} />
+            <Route path="incidents" element={<IncidentsPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
