@@ -1,0 +1,29 @@
+# env and secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# uploads and local data
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+
+backend/staticfiles/
