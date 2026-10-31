@@ -203,7 +203,7 @@ While `MOCK_EXTERNALS=true` (the default), AI, Razorpay, Telegram and email give
 
 ### AI
 
-Put `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-4o-mini`) in `.env` and set `MOCK_EXTERNALS=false`. AI reads quotation PDFs or photos into a draft you can edit, and suggests 25 to 40 tasks for a wedding. Amounts are always converted to paise in our own code, and totals are cross-checked against the line items. If AI is off or fails, a built-in checklist is used.
+Put `GROQ_API_KEY` in `.env` (create one at console.groq.com/keys) and set `AI_LIVE=true` (or `MOCK_EXTERNALS=false`), then restart the backend. In the Add quotation form, "Extract with AI" reads the PDF (text PDFs go to the text model, scanned PDFs and photos to the vision model) and fills the vendor, price per plate, total, valid-till date, menu notes and the item rows (matched to the form's row names for that vendor category); everything is highlighted so you can check it before saving. `GROQ_MODEL` and `GROQ_VISION_MODEL` are optional (defaults `openai/gpt-oss-120b` and `qwen/qwen3.8-27b`; Groq renames models now and then, see console.groq.com/docs/models). AI also suggests 25 to 40 tasks for a wedding. Amounts are always converted to paise in our own code, and totals are cross-checked against the line items. If AI is off or fails, a built-in checklist is used.
 
 ## Putting it online (not tested yet)
 

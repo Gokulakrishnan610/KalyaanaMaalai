@@ -136,8 +136,12 @@ CSRF_TRUSTED_ORIGINS = [FRONTEND_URL, CUSTOMER_SITE_URL]
 MOCK_EXTERNALS = "test" in sys.argv or env("MOCK_EXTERNALS", "true").lower() == "true"
 # the fake payment checkout is dev-only unless this is switched on on purpose (for example for a public demo)
 ALLOW_DEMO_PAYMENTS = env("ALLOW_DEMO_PAYMENTS", "false").lower() == "true"
-OPENAI_API_KEY = env("OPENAI_API_KEY")
-OPENAI_MODEL = env("OPENAI_MODEL")
+# AI is Groq. It is called for real when a key is set and either MOCK_EXTERNALS is off or AI_LIVE=true, so quotation
+# reading can be real while payments, email and Telegram stay fake. Tests never call it.
+GROQ_API_KEY = env("GROQ_API_KEY")
+GROQ_MODEL = env("GROQ_MODEL")  # text model, empty = openai/gpt-oss-120b
+GROQ_VISION_MODEL = env("GROQ_VISION_MODEL")  # reads photos and scanned PDFs, empty = qwen/qwen3.8-27b
+AI_LIVE = "test" not in sys.argv and (not MOCK_EXTERNALS or env("AI_LIVE", "false").lower() == "true")
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET")
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN")

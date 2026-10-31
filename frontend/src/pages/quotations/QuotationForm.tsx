@@ -131,6 +131,9 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
     mutationFn: async () => {
       const body = new FormData()
       body.append('file', file!)
+      // tell the AI which vendor category this is and what the form's rows are called, so the items land in them
+      body.append('category', request.category_name)
+      template.rows.forEach((row) => body.append('row_labels', row.label))
       return (await api.post<{ draft: QuotationDraft }>('/quotations/extract/', body)).data.draft
     },
     onSuccess: (draft) => {
@@ -173,10 +176,11 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
         filled.add('items')
       }
       setAiFields(filled)
+      const warnings = draft.warnings?.length ? ` ${draft.warnings.join(' ')}` : ''
       setAiMessage(
-        filled.size
+        (filled.size
           ? 'Filled in by AI. Check every highlighted field against the PDF before saving.'
-          : 'The AI could not find anything to fill in. Please type the quotation in.',
+          : 'The AI could not find anything to fill in. Please type the quotation in.') + warnings,
       )
     },
     onError: (error) => setAiMessage(`${error.message} You can still type the quotation in.`),

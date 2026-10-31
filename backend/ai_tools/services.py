@@ -1,12 +1,14 @@
 """AI helpers: reading a vendor's quotation and writing a wedding checklist.
 
 Rules: the model only READS and SUGGESTS. Amounts are converted to paise here in code (the model's own
-arithmetic is never trusted), and every answer is validated before anything is shown. While MOCK_EXTERNALS is
-true, or if the AI fails, answers come from local fallbacks so the demo never breaks.
+arithmetic is never trusted), and every answer is validated before anything is shown. The AI is Groq (an
+OpenAI-style chat API). While it is switched off (see `ai_is_live`), or if it fails, answers come from local
+fallbacks so the demo never breaks.
 """
 import base64
 import datetime as dt
 import io
+import json
 import logging
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -22,8 +24,11 @@ from ai_tools.schemas import ChecklistResponse, ExtractedQuotation
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "openai/gpt-oss-120b"  # reads text and writes the checklist
+DEFAULT_VISION_MODEL = "qwen/qwen3.8-27b"  # reads photos and scanned PDFs
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_OUTPUT_TOKENS = 8000
+MAX_SCAN_PAGES = 3  # the vision model takes at most 3 images per request
 MIN_TEXT_CHARS = 40  # a PDF with less text than this is treated as a scan
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 
@@ -45,22 +50,45 @@ def to_paise(rupees) -> int:
     return int((Decimal(str(rupees)) * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
+def ai_is_live() -> bool:
+    """True when Groq should really be called: a key is set and AI is switched on (AI_LIVE, or MOCK_EXTERNALS off)."""
+    return bool(settings.GROQ_API_KEY) and settings.AI_LIVE
+
+
 def _client():
-    if not settings.OPENAI_API_KEY:
-        raise AIUnavailable("OPENAI_API_KEY is not set, so AI is unavailable.")
-    from openai import OpenAI
-    return OpenAI(api_key=settings.OPENAI_API_KEY, timeout=60)
+    if not settings.GROQ_API_KEY:
+        raise AIUnavailable("GROQ_API_KEY is not set, so AI is unavailable.")
+    from groq import Groq
+    return Groq(api_key=settings.GROQ_API_KEY, timeout=120)
 
 
-def _parse(messages: list, response_format):
-    """One OpenAI structured-output call at temperature 0. Returns the parsed Pydantic object."""
-    completion = _client().beta.chat.completions.parse(
-        model=settings.OPENAI_MODEL or DEFAULT_MODEL, messages=messages, response_format=response_format,
-        temperature=0)
-    parsed = completion.choices[0].message.parsed
-    if parsed is None:
-        raise ValueError("The model returned no structured answer.")
-    return parsed
+def _simplify(content: list):
+    """Text-only models want a plain string; only a message with images needs the list of parts."""
+    if all(part["type"] == "text" for part in content):
+        return "\n\n".join(part["text"] for part in content)
+    return content
+
+
+def _parse(system: str, content: list, output_format, vision: bool = False):
+    """One Groq call that must answer with JSON in the shape of a Pydantic model. Returns the validated object.
+
+    JSON mode guarantees valid JSON, not the right fields, so the schema is described in the prompt and the answer
+    is checked against the model here (a bad answer raises, and the caller retries once).
+    """
+    model = (settings.GROQ_VISION_MODEL or DEFAULT_VISION_MODEL) if vision else (settings.GROQ_MODEL or DEFAULT_MODEL)
+    schema = json.dumps(output_format.model_json_schema())
+    response = _client().chat.completions.create(
+        model=model, temperature=0, max_completion_tokens=MAX_OUTPUT_TOKENS,
+        response_format={"type": "json_object"},
+        messages=[{"role": "system", "content": f"{system}\n\nAnswer with one JSON object that follows this JSON "
+                                                f"schema exactly, and nothing else:\n{schema}"},
+                  {"role": "user", "content": _simplify(content)}])
+    choice = response.choices[0]
+    if choice.finish_reason == "length":
+        raise ValueError("The answer was cut off.")
+    if not choice.message.content:
+        raise ValueError("The model returned no answer.")
+    return output_format.model_validate_json(choice.message.content)
 
 
 def _log(kind: str, input_info: dict, output, status: str):
@@ -86,7 +114,24 @@ def _mock_extraction() -> ExtractedQuotation:
         vendor_name=d["vendor_name"], total_rupees=d["total_rupees"], price_per_plate_rupees=d["price_per_plate_rupees"],
         guest_count=d["guest_count"], valid_till=d["valid_till"], menu_notes=d["menu_notes"], confidence=0.95,
         items=[{"description": a, "qty": b, "unit_price_rupees": c} for a, b, c in d["items"]],
-        warnings=["Demo mode: this is a sample reading, not your file. Turn off MOCK_EXTERNALS to use real AI."])
+        warnings=["Demo mode: this is a sample reading, not your file. Add GROQ_API_KEY and AI_LIVE=true to .env to use Groq."])
+
+
+def _system_prompt(category: str | None, preferred_names: list[str]) -> str:
+    prompt = (
+        "You read vendor quotations for a wedding planner in India. Return only what is printed in the document. "
+        "Amounts are in rupees as plain numbers (no symbols or commas). Use null for anything not printed; never "
+        "guess. valid_till must be YYYY-MM-DD and only when a calendar date is printed. List every priced line in "
+        "items with its quantity and unit price per unit (not the line total). vendor_name is the vendor's business "
+        "name only, without words like Quotation or Catering. Put anything doubtful in warnings "
+        "and lower the confidence.")
+    if category:
+        prompt += f" This quotation is from a {category} vendor."
+    if preferred_names:
+        prompt += (" The planner's form has these standard rows: " + "; ".join(preferred_names) + ". When a line in "
+                   "the document is the same thing as one of them, write that row's name EXACTLY as the line's "
+                   "description. Keep the document's own wording for lines that match none of them.")
+    return prompt
 
 
 def _pdf_text_and_pages(data: bytes) -> tuple[str, list[bytes]]:
@@ -97,7 +142,7 @@ def _pdf_text_and_pages(data: bytes) -> tuple[str, list[bytes]]:
             text = "\n".join((page.extract_text() or "") for page in pdf.pages).strip()
             images = []
             if len(text) < MIN_TEXT_CHARS:
-                for page in pdf.pages[:3]:
+                for page in pdf.pages[:MAX_SCAN_PAGES]:
                     buffer = io.BytesIO()
                     page.to_image(resolution=150).original.save(buffer, format="PNG")
                     images.append(buffer.getvalue())
@@ -106,17 +151,8 @@ def _pdf_text_and_pages(data: bytes) -> tuple[str, list[bytes]]:
         raise Unprocessable("This PDF could not be opened. Is it damaged or password protected?") from error
 
 
-def _messages(text: str, images: list[tuple[bytes, str]]) -> list:
-    instructions = (
-        "You read vendor quotations for a wedding planner in India. Return only what is printed in the document. "
-        "Amounts are in rupees as numbers (no symbols or commas). Use null for anything not printed; never guess. "
-        "valid_till must be YYYY-MM-DD and only when a calendar date is printed. List every priced line in items "
-        "with its quantity and unit price. Put anything doubtful in warnings and lower the confidence.")
-    content = [{"type": "text", "text": text or "Read the attached quotation."}]
-    for data, mime in images:
-        content.append({"type": "image_url",
-                        "image_url": {"url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}})
-    return [{"role": "system", "content": instructions}, {"role": "user", "content": content}]
+def _image_block(data: bytes, mime: str) -> dict:
+    return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}}
 
 
 def _to_draft(parsed: ExtractedQuotation) -> dict:
@@ -153,11 +189,14 @@ def _to_draft(parsed: ExtractedQuotation) -> dict:
     }
 
 
-def extract_quotation(file, filename: str | None = None) -> dict:
-    """Reads a quotation (PDF or image) and returns a DRAFT (nothing is saved).
+def extract_quotation(file, filename: str | None = None, category: str | None = None,
+                      preferred_names: list[str] | None = None) -> dict:
+    """Reads a quotation (PDF or image) with Groq and returns a DRAFT (nothing is saved).
 
-    `file` may be raw bytes or an uploaded file. Returns vendor_name, total_paise, price_per_plate_paise,
-    guest_count, valid_till, items[{description, qty, unit_price_paise}], menu_notes, confidence and warnings.
+    `file` may be raw bytes or an uploaded file. `category` and `preferred_names` (the form's standard row names)
+    help the AI name the line items so they land in the right rows. Returns vendor_name, total_paise,
+    price_per_plate_paise, guest_count, valid_till, items[{description, qty, unit_price_paise}], menu_notes,
+    confidence and warnings.
     """
     data = file if isinstance(file, bytes) else file.read()
     name = filename or getattr(file, "name", "") or "quotation.pdf"
@@ -166,23 +205,29 @@ def extract_quotation(file, filename: str | None = None) -> dict:
     if len(data) > MAX_UPLOAD_BYTES:
         raise Unprocessable("This file is larger than 10 MB.")
 
-    if settings.MOCK_EXTERNALS:
+    if not ai_is_live():
         draft = _to_draft(_mock_extraction())
         _log("extract_quotation", {**info, "mode": "mock"}, draft, "SUCCESS")
         return draft
 
+    system = _system_prompt(category, preferred_names or [])
     if extension in IMAGE_TYPES:
-        text, images = "", [(data, IMAGE_TYPES[extension])]
+        content, vision = [{"type": "text", "text": "Read this quotation."}, _image_block(data, IMAGE_TYPES[extension])], True
     else:
         text, page_images = _pdf_text_and_pages(data)
-        images = [(image, "image/png") for image in page_images]
-        text = f"Quotation text:\n{text}" if text else ""
-
+        if page_images:  # a scanned PDF: no text to read, so the vision model looks at the pages
+            content = [{"type": "text", "text": "Read this scanned quotation."},
+                       *[_image_block(image, "image/png") for image in page_images]]
+            vision = True
+        else:
+            content, vision = [{"type": "text", "text": f"Quotation text:\n{text}"}], False
+    model = (settings.GROQ_VISION_MODEL or DEFAULT_VISION_MODEL) if vision else (settings.GROQ_MODEL or DEFAULT_MODEL)
     last_error = None
     for _attempt in range(2):  # one retry when the answer does not validate
         try:
-            draft = _to_draft(_parse(_messages(text, images), ExtractedQuotation))
-            _log("extract_quotation", {**info, "mode": "vision" if images else "text"}, draft, "SUCCESS")
+            draft = _to_draft(_parse(system, content, ExtractedQuotation, vision=vision))
+            _log("extract_quotation", {**info, "mode": "vision" if vision else "text", "model": model},
+                 draft, "SUCCESS")
             return draft
         except (PydanticError, ValueError) as error:
             last_error = error
@@ -215,13 +260,14 @@ def _normal(title: str) -> str:
 
 def _ai_checklist(context: dict) -> list[dict]:
     prompt = (
-        "You are an experienced Indian wedding planner. Write 25 to 40 specific planning tasks for this wedding. "
+        "Write 25 to 40 specific planning tasks for this wedding. "
         "Tailor them: each function adds its own tasks (a mehendi adds artists and seating; a sangeet adds "
         "choreography and sound checks); large guest counts add crowd, parking and security tasks; use the city "
         "and the vendors already chosen. due_offset_days is days from the first wedding day (negative = before). "
         "priority is LOW, MEDIUM or HIGH. function_name must be one of the listed functions or null. "
         f"No duplicates.\n\nWedding: {context}")
-    result = _parse([{"role": "user", "content": prompt}], ChecklistResponse)
+    result = _parse("You are an experienced Indian wedding planner.", [{"type": "text", "text": prompt}],
+                    ChecklistResponse)
     if len(result.tasks) < 15:
         raise ValueError("The AI returned too few tasks.")
     return [t.model_dump() for t in result.tasks[:40]]
@@ -231,7 +277,7 @@ def generate_checklist(wedding) -> dict:
     """A PREVIEW of tasks (nothing is saved): {source: "ai" | "template", notice, tasks[]}."""
     context = _wedding_context(wedding)
     source, notice, raw = "template", "", None
-    if settings.MOCK_EXTERNALS or not settings.OPENAI_API_KEY:
+    if not ai_is_live():
         notice = "AI is switched off, so this is the built-in checklist tailored to your wedding."
     else:
         try:

@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
@@ -231,7 +232,13 @@ class QuotationExtract(PlannerWrites):
             return Response({"detail": "Reading quotations with AI is not available yet. Please type it in."},
                             status=status.HTTP_501_NOT_IMPLEMENTED)
         try:
-            draft = extract_quotation(upload)
+            # the form says which vendor category this is and what its standard rows are called, so the AI names
+            # the line items the same way and they fill the right rows
+            draft = extract_quotation(
+                upload, category=(request.data.get("category") or "")[:80] or None,
+                preferred_names=[n[:80] for n in request.data.getlist("row_labels")[:40]])
+        except APIException as error:  # a clear reason from the AI part (unreadable file, AI unavailable ...)
+            return Response({"detail": str(error.detail)}, status=error.status_code)
         except Exception:  # noqa: BLE001 - a flaky PDF must never block manual entry
             services.logger.exception("Quotation extraction failed")
             return Response({"detail": "Could not read this file. Please type the quotation in."}, status=422)
