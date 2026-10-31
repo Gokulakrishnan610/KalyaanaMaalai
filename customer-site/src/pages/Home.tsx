@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { CalendarHeart, CheckCircle2, MessageCircle, Wallet } from 'lucide-react'
+import { CalendarHeart, CheckCircle2, FileSignature, MessageCircle, Wallet } from 'lucide-react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, get, post, TOKEN_KEY } from '@/api/client'
 import { useAuth, type Portal } from '@/auth/AuthContext'
@@ -32,6 +32,7 @@ export default function Home() {
   const loggedIn = Boolean(localStorage.getItem(TOKEN_KEY))
 
   const me = useQuery({ queryKey: ['me'], queryFn: () => get<Portal>('/portal/me/'), enabled: loggedIn, refetchInterval: 20_000 })
+  const agreements = useQuery({ queryKey: ['agreements'], queryFn: () => get<{ id: number; title: string; status: 'SENT' | 'SIGNED'; wedding_title: string }[]>('/portal/agreements/'), enabled: loggedIn && Boolean(me.data?.is_client) })
   const invoices = useQuery({
     queryKey: ['invoices'],
     queryFn: () => get<InvoiceRow[]>('/portal/invoices/'),
@@ -90,6 +91,17 @@ export default function Home() {
             </ol>
           )}
         </section>
+
+        {agreements.data?.map((a) => (
+          <section key={a.id} className={cn('flex flex-wrap items-center justify-between gap-4 rounded-3xl p-6 ring-1', a.status === 'SENT' ? 'bg-gold-400/15 ring-gold-400/60' : 'bg-white ring-stone-200')}>
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gold-500"><FileSignature size={16} /> Agreement</div>
+              <h2 className="font-serif text-xl text-maroon-900">{a.title}</h2>
+              <p className="text-sm text-stone-600">{a.status === 'SENT' ? 'Please read and sign it to confirm your booking.' : 'Signed. Thank you!'}</p>
+            </div>
+            <LinkButton to={`/agreement/${a.id}`} look={a.status === 'SENT' ? 'primary' : 'outline'}>{a.status === 'SENT' ? 'Read and sign' : 'View signed copy'}</LinkButton>
+          </section>
+        ))}
 
         <div className="grid gap-6 md:grid-cols-2">
           <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">

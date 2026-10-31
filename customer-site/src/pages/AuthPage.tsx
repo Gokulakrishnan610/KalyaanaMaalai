@@ -74,6 +74,7 @@ export default function AuthPage({ mode }: { mode: 'signup' | 'login' }) {
           {message && !Object.keys(errors).some((k) => ['name', 'email', 'phone', 'password'].includes(k)) && (
             <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{message}</p>
           )}
+          {!isSignup && <p className="text-right text-sm"><Link to="/forgot" className="font-medium text-maroon-700 hover:underline">Forgot your password?</Link></p>}
           <Button type="submit" className="w-full" loading={busy}>
             {isSignup ? 'Create account' : 'Log in'}
           </Button>
