@@ -128,7 +128,8 @@ CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key", "last-event-id"]  # l
 CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
 
 # --- Outside services. While MOCK_EXTERNALS is true they return fake answers, so the demo never breaks.
-MOCK_EXTERNALS = env("MOCK_EXTERNALS", "true").lower() == "true"
+# tests always use the fake answers, whatever .env says, so they never reach a real service or spend real money
+MOCK_EXTERNALS = "test" in sys.argv or env("MOCK_EXTERNALS", "true").lower() == "true"
 # the fake payment checkout is dev-only unless this is switched on on purpose (for example for a public demo)
 ALLOW_DEMO_PAYMENTS = env("ALLOW_DEMO_PAYMENTS", "false").lower() == "true"
 OPENAI_API_KEY = env("OPENAI_API_KEY")
