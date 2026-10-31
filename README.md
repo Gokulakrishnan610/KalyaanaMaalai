@@ -13,19 +13,22 @@ You need Python 3.10+, Node 20+ and PostgreSQL 15 (Docker or installed locally).
 cp .env.example .env
 cp frontend/.env.example frontend/.env.local
 
-# 2. database: use Docker...
-docker compose up -d db
-# ...or a local Postgres with user "wedding", password "wedding", database "wedding"
-#    (the user also needs CREATEDB so the tests can run)
+# 2. database and Redis: use Docker...
+docker compose up -d db redis
+# ...or a local Postgres (user "wedding", password "wedding", database "wedding"; the user also
+#    needs CREATEDB so the tests can run) and a local Redis (`brew install redis && brew services start redis`)
 
 # 3. backend
 python3 -m venv backend/.venv
 backend/.venv/bin/pip install -r backend/requirements.txt
 make reset-db        # creates all the tables
 make demo            # loads the Aarav & Meera demo data
-make run             # backend at http://localhost:8000
+make run             # backend at http://localhost:8000 (uvicorn: live updates need it)
 
-# 4. website (second terminal)
+# 4. background jobs (second terminal): late-vendor alerts, payment reminders, Telegram
+make worker
+
+# 5. website (third terminal)
 cd frontend && npm install && npm run dev    # http://localhost:5173
 ```
 
@@ -51,6 +54,8 @@ backend/
   ai_tools/         reading quotation PDFs and writing checklists with AI
   notifications/    alerts (bell icon, Telegram)
   dashboard/        the founder's summary page
+  incidents/        problems reported during weddings: assign, track, resolve
+  live/             instant updates: events go through Redis to every open browser
   common/           shared helpers: who-can-do-what, timed jobs, demo-data command
   demo_data/        the sample wedding used for demos
 
@@ -74,7 +79,7 @@ Every backend folder follows the same pattern: `models.py` (the data), `serializ
 | `make reset-db` | Empty the database and rebuild the tables (development only) |
 | `make demo` | Load the demo wedding (safe to run twice) |
 | `make test` | Run the backend tests |
-| `make jobs` | Run timed jobs, like late-vendor alerts |
+| `make worker` | Run the Celery worker and timer (needs Redis) |
 | `make api-types` | Refresh the website's API types (backend must be running) |
 
 When you change a model: `cd backend && .venv/bin/python manage.py makemigrations`, commit the new migration file, and teammates run `make reset-db && make demo` or `manage.py migrate`.
@@ -97,7 +102,7 @@ The dashboard reads the weddings, payments, tasks and vendor-arrival tables, so 
 - **Vendor bills:** the same vendor + bill reference twice is refused, and a bill with the same vendor and amount due within a week gives a warning. Vendor payments send an `Idempotency-Key`, so a double click or retry records one payment.
 - **Pay online (Razorpay test mode):** "Pay online" on an invoice. With `MOCK_EXTERNALS=true` it opens a demo checkout and no real money moves.
 - **AI:** `POST /api/ai/extract-quotation/` reads a vendor PDF or photo and returns a draft in paise (the form can edit it before saving); `POST /api/ai/generate-checklist/` previews 25-40 tasks tailored to the wedding and `.../confirm/` saves the ones you keep. If AI is off or fails, a built-in checklist is used. Components: `AIExtractModal` and `AIChecklistButton` in `frontend/src/pages/ai`.
-- **Alerts:** the bell in the top bar (refreshes every 30 s) and the Notifications page. `notifications.services.notify(message, severity=...)` saves an alert and sends it to Telegram when set up. `make jobs` also reminds you once a day about vendor payments due within 3 days or overdue.
+- **Alerts:** the bell in the top bar (refreshes every 30 s) and the Notifications page. `notifications.services.notify(message, severity=...)` saves an alert and sends it to Telegram when set up. `make worker` also reminds you once a day about vendor payments due within 3 days or overdue.
 
 ### Set up Telegram alerts (optional)
 
@@ -124,20 +129,39 @@ Backend (Render, Railway or similar), with a hosted Postgres:
 
 ```bash
 pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput   # build
-gunicorn config.wsgi --workers 1 --bind 0.0.0.0:$PORT                                                      # start
+uvicorn config.asgi:application --host 0.0.0.0 --port $PORT --workers 2                                    # start (not gunicorn's plain workers: they would block live updates)
+celery -A config worker --beat -l info                                                                     # second process: background jobs
 python manage.py load_demo_data                                                                            # once, for demo data
 ```
 
-Set these environment variables: `ENVIRONMENT=production`, `SECRET_KEY` (long and random), `DATABASE_URL`, `ALLOWED_HOSTS` (your backend's domain), `FRONTEND_URL` (your website's address), `MOCK_EXTERNALS=true`. Keep **one** worker if you also run timed jobs.
+Set these environment variables: `ENVIRONMENT=production`, `SECRET_KEY` (long and random), `DATABASE_URL`, `ALLOWED_HOSTS` (your backend's domain), `FRONTEND_URL` (your website's address), `REDIS_URL` (a hosted Redis, for example Render Key Value or Upstash), `MOCK_EXTERNALS=true`. Run exactly **one** Celery process with `--beat`, otherwise every timed job runs twice.
 
 Website (Vercel or Netlify): build command `npm run build`, folder `frontend`, output `dist`, environment variable `VITE_API_URL=https://your-backend-domain/api`.
+
+## Live updates (no refreshing)
+
+Open screens update by themselves. When anything changes, the backend publishes a small event to **Redis**, and every logged-in browser receives it over one open connection (**Server-Sent Events**, `GET /api/live/stream/`). The website then refreshes just the screens that event affects, and alerts appear as pop-ups. A green **Live** dot in the top bar shows the connection. If it drops, the website reconnects and catches up on what it missed.
+
+| What happens | Who sees it, instantly |
+|---|---|
+| A task moves or is assigned | Everyone's task board and the dashboard; the assignee also gets an alert |
+| A vendor checks in or is marked late | Event Day screen, wedding page, dashboard; planners get a late alert |
+| An incident is reported | All planners get an alert (serious ones also go to Telegram); the incidents list and dashboard update |
+| A vendor sends a quotation | Planners get an alert; the comparison table updates |
+| A payment is recorded | Planners get an alert; the finance tab, the client's balance and the dashboard update |
+
+How it works: `live/signals.py` listens for saves (tasks, arrivals, payments, quotations, incidents, alerts) and publishes events after the database commit, so no other app has to call anything. `live/bus.py` is the Redis connection (publishing takes a millisecond and never fails a save if Redis is down). `live/views.py` is the stream. `frontend/src/live/` reads it. To make something else live, add one handler in `live/signals.py` and list which screens to refresh in `frontend/src/live/LiveProvider.tsx`.
+
+## Background jobs (Celery + Redis)
+
+Timed and slow work runs outside the web request, in a **Celery** worker with Redis as the message queue (`make worker`). The schedule comes from `backend/common/jobs.py`: late-vendor check every minute, vendor payment reminders every morning. Telegram messages are also sent by the worker, so raising an alert never waits on Telegram; if the worker is down, it is sent directly instead.
 
 ## Rules we agreed on
 
 - **Money** is always whole **paise** (1 rupee = 100 paise). The website converts for display.
 - **Roles:** founder (everything), planner, staff. The founder passes every permission check. Use `allow_roles(Role.PLANNER)` from `common/permissions.py`.
 - **Outside services** (AI, Razorpay, Telegram, email) give fake answers while `MOCK_EXTERNALS=true`, so demos never break.
-- **Timed jobs:** write a function in your app and add one line to `backend/common/jobs.py`.
+- **Timed jobs:** write a function in your app and add one line to `backend/common/jobs.py`. Celery runs it (`make worker`).
 - Only Member 1 edits `backend/config/urls.py`, `frontend/src/App.tsx` and the layout. Everyone else works inside their own app folder and page folder.
 
 ## Branches and commits
