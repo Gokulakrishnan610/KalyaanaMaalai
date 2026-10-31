@@ -50,7 +50,7 @@ export default function Home() {
   const due = (invoices.data ?? []).filter((i) => i.remaining_paise > 0)
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-screen">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
           <Logo />

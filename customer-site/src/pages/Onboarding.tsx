@@ -72,7 +72,7 @@ export default function Onboarding() {
   const today = new Date().toISOString().slice(0, 10)
 
   return (
-    <div className="min-h-full bg-ivory">
+    <div className="min-h-screen bg-ivory">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5">
           <Logo />

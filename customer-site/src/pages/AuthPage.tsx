@@ -49,15 +49,16 @@ export default function AuthPage({ mode }: { mode: 'signup' | 'login' }) {
   }
 
   return (
-    <div className="grid min-h-full md:grid-cols-2">
+    <div className="grid min-h-screen md:grid-cols-2">
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-maroon-900 via-maroon-700 to-maroon-500 p-12 text-white md:flex">
-        <Logo light />
-        <div>
+        <img src={isSignup ? '/photos/hero-2.jpg' : '/photos/hero-1.jpg'} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-maroon-900/90 via-maroon-900/50 to-maroon-900/30" />
+        <div className="relative"><Logo light /></div>
+        <div className="relative">
           <p className="font-serif text-4xl leading-snug">“Shaadi planning should feel like a celebration, not a to-do list.”</p>
           <p className="mt-4 text-white/70">Create your account and we will take care of the rest.</p>
         </div>
-        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full border-[28px] border-white/10" />
-      </aside>
+              </aside>
 
       <main className="flex items-center justify-center px-5 py-12">
         <form onSubmit={submit} noValidate className="w-full max-w-sm space-y-4">

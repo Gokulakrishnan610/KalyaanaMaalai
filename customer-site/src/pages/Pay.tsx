@@ -41,7 +41,7 @@ function loadCheckout(): Promise<void> {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-full flex-col items-center bg-blush px-4 py-10">
+    <div className="flex min-h-screen flex-col items-center bg-blush px-4 py-10">
       <div className="mb-6 text-center"><Logo /></div>
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">{children}</div>
       <p className="mt-6 flex items-center gap-1.5 text-xs text-stone-500"><ShieldCheck size={14} /> Your card and bank details go to the payment gateway, never to us.</p>
