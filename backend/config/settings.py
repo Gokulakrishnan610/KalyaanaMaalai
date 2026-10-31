@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # serves the admin's CSS when deployed
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -93,6 +94,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 MEDIA_URL = "uploads/"
 MEDIA_ROOT = BASE_DIR / env("UPLOAD_DIR", "uploads")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -115,6 +120,7 @@ SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("LOGIN_MINUTES"
 
 FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173")
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL, "http://localhost:5173"]
+CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
 
 # --- Outside services. While MOCK_EXTERNALS is true they return fake answers, so the demo never breaks.
 MOCK_EXTERNALS = env("MOCK_EXTERNALS", "true").lower() == "true"

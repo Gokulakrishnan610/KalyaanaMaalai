@@ -79,6 +79,29 @@ Every backend folder follows the same pattern: `models.py` (the data), `serializ
 
 When you change a model: `cd backend && .venv/bin/python manage.py makemigrations`, commit the new migration file, and teammates run `make reset-db && make demo` or `manage.py migrate`.
 
+## What works today (Member 1 part)
+
+- **Login** for founder, planner and staff, with role checks (staff can look but not change; only the founder deletes).
+- **Enquiries:** board (drag a card to change its stage) and table, filter by source, search, add/edit form, first-consultation date, and **Convert to client** (optionally also starting the wedding project). Converting twice never creates a second client.
+- **Clients:** list, search, and a profile showing weddings, enquiry history and what the couple still owes.
+- **Dashboard:** revenue, expenses, profit, money couples still owe, enquiries by source, profit per wedding, vendor payments due this week, upcoming consultations and a late-vendors alert.
+
+The dashboard reads the weddings, payments, tasks and vendor-arrival tables, so it fills up automatically as the other members' parts are built.
+
+## Putting it online (not tested yet)
+
+Backend (Render, Railway or similar), with a hosted Postgres:
+
+```bash
+pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput   # build
+gunicorn config.wsgi --workers 1 --bind 0.0.0.0:$PORT                                                      # start
+python manage.py load_demo_data                                                                            # once, for demo data
+```
+
+Set these environment variables: `ENVIRONMENT=production`, `SECRET_KEY` (long and random), `DATABASE_URL`, `ALLOWED_HOSTS` (your backend's domain), `FRONTEND_URL` (your website's address), `MOCK_EXTERNALS=true`. Keep **one** worker if you also run timed jobs.
+
+Website (Vercel or Netlify): build command `npm run build`, folder `frontend`, output `dist`, environment variable `VITE_API_URL=https://your-backend-domain/api`.
+
 ## Rules we agreed on
 
 - **Money** is always whole **paise** (1 rupee = 100 paise). The website converts for display.
