@@ -8,7 +8,9 @@ import { LoginProvider } from './login/LoginContext'
 import './index.css'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+  // data counts as fresh for 30 seconds, so going back to a screen shows it at once without asking the server again;
+  // the live connection still refreshes anything that changes
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000, gcTime: 10 * 60_000 } },
 })
 
 createRoot(document.getElementById('root')!).render(

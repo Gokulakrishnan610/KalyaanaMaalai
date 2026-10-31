@@ -15,9 +15,9 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, Suspense } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Emblem, cn } from '@/components/common'
+import { Emblem, Spinner, cn } from '@/components/common'
 import { LiveStatus } from '@/live/LiveStatus'
 import { useLogin } from '@/login/LoginContext'
 import { NotificationBell } from '@/pages/notifications/NotificationBell'
@@ -170,7 +170,7 @@ export function AppLayout() {
         <main className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
           {/* keyed by address, so every screen change replays the entrance animation */}
           <div key={location.pathname} className="page-enter mx-auto max-w-[1400px]">
-            <Outlet />
+            <Suspense fallback={<Spinner />}><Outlet /></Suspense>
           </div>
         </main>
       </div>

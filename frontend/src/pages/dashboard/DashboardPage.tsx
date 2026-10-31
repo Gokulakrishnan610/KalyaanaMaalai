@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { get } from '@/api/client'
 import { Badge, CountUp, EmptyState, ErrorState, Panel, ShowMore, Spinner } from '@/components/common'
 import { formatDate, formatDateTime, timeAgo } from '@/helpers/date'
@@ -197,19 +196,33 @@ export default function DashboardPage() {
           {moneyData.length === 0 ? (
             <Empty>Nothing to compare yet.</Empty>
           ) : (
-            <div style={{ height: 56 + moneyData.length * 44 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={moneyData} layout="vertical" margin={{ left: 8, right: 16 }} barGap={2}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" fontSize={11} stroke="#94a3b8" tickFormatter={(v: number) => (v >= 100000 ? `${v / 100000}L` : String(v))} />
-                  <YAxis type="category" dataKey="name" width={130} fontSize={12} stroke="#64748b" tickLine={false} axisLine={false} />
-                  <Tooltip formatter={(v) => formatINR(Number(v) * 100)} cursor={{ fill: '#f1f5f9' }} />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Revenue" fill="#9c1c40" radius={[0, 4, 4, 0]} barSize={12} />
-                  <Bar dataKey="Expenses" fill="#94a3b8" radius={[0, 4, 4, 0]} barSize={12} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <>
+              <div className="mb-4 flex gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand-600" /> Revenue</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-slate-400" /> Expenses</span>
+              </div>
+              {/* plain bars instead of a chart library: the dashboard loads about 10 times less code */}
+              <ul className="space-y-4">
+                {moneyData.map((w) => {
+                  const max = Math.max(...moneyData.map((x) => Math.max(x.Revenue, x.Expenses)), 1)
+                  return (
+                    <li key={w.name} className="grid grid-cols-[8rem_1fr] items-center gap-3 text-sm">
+                      <span className="truncate text-slate-700" title={w.name}>{w.name}</span>
+                      <div className="space-y-1">
+                        {([['Revenue', w.Revenue, 'bg-brand-600'], ['Expenses', w.Expenses, 'bg-slate-400']] as const).map(([label, value, colour]) => (
+                          <div key={label} className="flex items-center gap-2" title={`${label}: ${formatINR(value * 100)}`}>
+                            <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <div className={`h-full rounded-full ${colour}`} style={{ width: `${(value / max) * 100}%` }} />
+                            </div>
+                            <span className="num w-24 shrink-0 text-right text-xs text-slate-500">{formatINR(value * 100)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
           )}
         </Panel>
 

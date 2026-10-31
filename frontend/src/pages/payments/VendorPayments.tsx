@@ -29,8 +29,8 @@ export function VendorPayments({ weddingId, weddings, adding, onCloseAdd }: { we
   const [target, setTarget] = useState<Target | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['finance', 'bills', weddingId ?? 'all'],
-    queryFn: () => get<VendorBill[]>('/finance/vendor-bills/', { wedding: weddingId ?? undefined }),
+    queryKey: ['finance', 'bills', weddingId ?? 'all', filter],
+    queryFn: () => get<VendorBill[]>('/finance/vendor-bills/', { wedding: weddingId ?? undefined, status: filter === 'all' ? undefined : filter }),
   })
   const del = useMutation({ mutationFn: (id: number) => remove(`/expenses/${id}/`), onSuccess: () => refresh() })
 

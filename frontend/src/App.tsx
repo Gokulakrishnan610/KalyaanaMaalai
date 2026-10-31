@@ -1,34 +1,39 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { Spinner } from '@/components/common'
 import { RequireLogin } from '@/components/RequireLogin'
 import { AppLayout } from '@/layout/AppLayout'
-import CheckinPage from '@/pages/checkin/PublicCheckinPage'
-import AgreementsPage from '@/pages/agreements/AgreementsPage'
-import EmailsPage from '@/pages/emails/EmailsPage'
-import ClientPage from '@/pages/clients/ClientPage'
-import ClientsPage from '@/pages/clients/ClientsPage'
-import DashboardPage from '@/pages/dashboard/DashboardPage'
-import EnquiriesPage from '@/pages/enquiries/EnquiriesPage'
-import IncidentsPage from '@/pages/incidents/IncidentsPage'
-import LoginPage from '@/pages/login/LoginPage'
-import NotificationsPage from '@/pages/notifications/NotificationsPage'
-import PublicPayPage from '@/pages/pay/PublicPayPage'
-import PaymentsPage from '@/pages/payments/PaymentsPage'
-import QuotationsPage from '@/pages/quotations/QuotationsPage'
-import RequestDetailPage from '@/pages/quotations/RequestDetailPage'
-import VendorAccountPage from '@/pages/vendor-portal/VendorAccountPage'
-import VendorBookingsPage from '@/pages/vendor-portal/VendorBookingsPage'
 import { VendorLayout } from '@/pages/vendor-portal/VendorLayout'
-import VendorPaymentsPage from '@/pages/vendor-portal/VendorPaymentsPage'
-import VendorRequestsPage from '@/pages/vendor-portal/VendorRequestsPage'
-import VendorProfilePage from '@/pages/vendors/VendorProfilePage'
-import VendorsPage from '@/pages/vendors/VendorsPage'
-import WeddingDetailPage from '@/pages/weddings/WeddingDetailPage'
-import WeddingsPage from '@/pages/weddings/WeddingsPage'
+
+// every page is loaded only when it is first opened, so the first screen downloads much less
+const CheckinPage = lazy(() => import('@/pages/checkin/PublicCheckinPage'))
+const AgreementsPage = lazy(() => import('@/pages/agreements/AgreementsPage'))
+const EmailsPage = lazy(() => import('@/pages/emails/EmailsPage'))
+const ClientPage = lazy(() => import('@/pages/clients/ClientPage'))
+const ClientsPage = lazy(() => import('@/pages/clients/ClientsPage'))
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'))
+const EnquiriesPage = lazy(() => import('@/pages/enquiries/EnquiriesPage'))
+const IncidentsPage = lazy(() => import('@/pages/incidents/IncidentsPage'))
+const LoginPage = lazy(() => import('@/pages/login/LoginPage'))
+const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'))
+const PublicPayPage = lazy(() => import('@/pages/pay/PublicPayPage'))
+const PaymentsPage = lazy(() => import('@/pages/payments/PaymentsPage'))
+const QuotationsPage = lazy(() => import('@/pages/quotations/QuotationsPage'))
+const RequestDetailPage = lazy(() => import('@/pages/quotations/RequestDetailPage'))
+const VendorAccountPage = lazy(() => import('@/pages/vendor-portal/VendorAccountPage'))
+const VendorBookingsPage = lazy(() => import('@/pages/vendor-portal/VendorBookingsPage'))
+const VendorPaymentsPage = lazy(() => import('@/pages/vendor-portal/VendorPaymentsPage'))
+const VendorRequestsPage = lazy(() => import('@/pages/vendor-portal/VendorRequestsPage'))
+const VendorProfilePage = lazy(() => import('@/pages/vendors/VendorProfilePage'))
+const VendorsPage = lazy(() => import('@/pages/vendors/VendorsPage'))
+const WeddingDetailPage = lazy(() => import('@/pages/weddings/WeddingDetailPage'))
+const WeddingsPage = lazy(() => import('@/pages/weddings/WeddingsPage'))
 
 // Only Member 1 edits this file. Every page lives in its own folder under pages/.
 export default function App() {
   return (
     <BrowserRouter>
+      <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/checkin/:token" element={<CheckinPage />} />
@@ -59,6 +64,7 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

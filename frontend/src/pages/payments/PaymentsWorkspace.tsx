@@ -31,8 +31,8 @@ export function PaymentsWorkspace({ weddingId }: { weddingId: number | null }) {
     queryFn: () => get<InvoiceRow[]>('/invoices/', { wedding: weddingId ?? undefined, status: 'open' }),
   })
   const bills = useQuery({
-    queryKey: ['finance', 'bills', scope],
-    queryFn: () => get<VendorBill[]>('/finance/vendor-bills/', { wedding: weddingId ?? undefined }),
+    queryKey: ['finance', 'bills', scope, 'open'],
+    queryFn: () => get<VendorBill[]>('/finance/vendor-bills/', { wedding: weddingId ?? undefined, status: 'open' }),
   })
   const lateFromCustomers = invoices.data?.filter((i) => i.overdue).length ?? 0
   const lateToVendors = bills.data?.filter((b) => b.overdue).length ?? 0

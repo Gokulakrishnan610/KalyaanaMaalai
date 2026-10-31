@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { LogOut } from 'lucide-react'
 import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom'
@@ -54,7 +55,7 @@ export function VendorLayout() {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{data ? <Outlet /> : <Spinner />}</main>
+      <main className="mx-auto max-w-5xl px-4 py-6">{data ? <Suspense fallback={<Spinner />}><Outlet /></Suspense> : <Spinner />}</main>
     </div>
   )
 }
