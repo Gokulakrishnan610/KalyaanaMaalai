@@ -8,21 +8,28 @@ interface Props {
   vendorId: number
   vendorName: string
   weddingId: number
+  /** The rating given earlier, so editing starts from it. */
+  existing?: { punctuality: number; quality: number; pricing: number; comment: string }
   onClose: () => void
 }
 
 /** Rate how a vendor did at one wedding. Rating again replaces the earlier rating. */
-export function RateVendorModal({ vendorId, vendorName, weddingId, onClose }: Props) {
+export function RateVendorModal({ vendorId, vendorName, weddingId, existing, onClose }: Props) {
   const queryClient = useQueryClient()
-  const [scores, setScores] = useState({ punctuality: 0, quality: 0, pricing: 0 })
-  const [comment, setComment] = useState('')
+  const [scores, setScores] = useState({
+    punctuality: existing?.punctuality ?? 0,
+    quality: existing?.quality ?? 0,
+    pricing: existing?.pricing ?? 0,
+  })
+  const [comment, setComment] = useState(existing?.comment ?? '')
   const ready = scores.punctuality > 0 && scores.quality > 0 && scores.pricing > 0
 
   const save = useMutation({
     mutationFn: () => post(`/vendors/${vendorId}/ratings/`, { wedding_id: weddingId, ...scores, comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] })
-      queryClient.invalidateQueries({ queryKey: ['vendor-profile', vendorId] })
+      queryClient.invalidateQueries({ queryKey: ['vendor-profile', String(vendorId)] })
+      queryClient.invalidateQueries({ queryKey: ['wedding-vendors'] })
       onClose()
     },
   })

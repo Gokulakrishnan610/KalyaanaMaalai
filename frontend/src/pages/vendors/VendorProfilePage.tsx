@@ -100,7 +100,11 @@ export default function VendorProfilePage() {
         />
       )}
       {rating !== null && (
-        <RateVendorModal vendorId={vendor.id} vendorName={vendor.name} weddingId={rating} onClose={() => setRating(null)} />
+        <RateVendorModal
+          vendorId={vendor.id}
+          vendorName={vendor.name}
+          weddingId={rating}
+          existing={vendor.ratings.find((r) => r.wedding_id === rating)} onClose={() => setRating(null)} />
       )}
     </div>
   )
