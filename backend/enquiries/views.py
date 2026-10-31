@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from clients.serializers import ClientSerializer
+from clients.services import find_client
 from common.permissions import Role, allow_roles, read_for_all_write_for
 from enquiries.models import Enquiry, FollowUp
 from enquiries.serializers import ConvertSerializer, EnquirySerializer, FollowUpSerializer
@@ -25,7 +26,10 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         if params.get("source"):
             enquiries = enquiries.filter(source=params["source"])
         if params.get("q"):
-            enquiries = enquiries.filter(Q(couple_name__icontains=params["q"]) | Q(phone__icontains=params["q"]))
+            text = params["q"]
+            enquiries = enquiries.filter(
+                Q(couple_name__icontains=text) | Q(client_name__icontains=text) | Q(partner_name__icontains=text)
+                | Q(email__icontains=text) | Q(spouse_email__icontains=text) | Q(phone__icontains=text))
         return enquiries.order_by("-created_at")
 
     def get_permissions(self):
@@ -35,7 +39,10 @@ class EnquiryViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # whoever enters the enquiry owns it, unless they picked someone else
-        serializer.save(owner=serializer.validated_data.get("owner") or self.request.user)
+        # a returning client (same client name + email) is linked to their existing record, not duplicated
+        data = serializer.validated_data
+        existing = find_client(data.get("client_name", ""), data.get("email", ""))
+        serializer.save(owner=data.get("owner") or self.request.user, client=existing)
 
     @action(detail=True, methods=["post"])
     def convert(self, request, pk=None):

@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Emblem, cn } from '@/components/common'
 import { LiveStatus } from '@/live/LiveStatus'
 import { useLogin } from '@/login/LoginContext'
@@ -70,16 +70,22 @@ export function AppLayout() {
         )}
       >
         <div className="pointer-events-none absolute -bottom-16 -left-10 h-48 w-48 rounded-full bg-brand-500/20 blur-3xl" aria-hidden="true" />
-        <div className="flex h-16 items-center justify-between px-4">
-          {!collapsed && (
-            <div className="flex items-center gap-2.5 leading-tight">
-              <Emblem className="float h-9 w-9" />
+        <div className={cn('flex items-center px-4', collapsed ? 'flex-col gap-1 py-3' : 'h-16 justify-between')}>
+          {/* the logo always leads back to the homepage, from every screen */}
+          <Link
+            to="/"
+            aria-label="KalyaanaMaalai home"
+            title="Go to the homepage"
+            className="group flex items-center gap-2.5 rounded-xl leading-tight outline-offset-4"
+          >
+            <Emblem className="float h-9 w-9 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+            {!collapsed && (
               <div>
                 <div className="font-semibold tracking-wide text-white">KalyaanaMaalai</div>
                 <div className="text-[11px] text-slate-400">Shaandaar Events</div>
               </div>
-            </div>
-          )}
+            )}
+          </Link>
           <button
             aria-label="Toggle sidebar"
             className="rounded-lg p-2 text-slate-400 hover:bg-sidebar-hover hover:text-white"

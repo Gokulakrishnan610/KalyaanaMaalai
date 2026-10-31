@@ -1,8 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type DragEvent } from 'react'
-import { api, post, ApiError } from '@/api/client'
+import { api, get, post, ApiError, type Page } from '@/api/client'
 import { Button, Input, Modal, Select, cn } from '@/components/common'
 import { formatINR, paiseToRupees, rupeesToPaise } from '@/helpers/money'
+import type { Vendor } from '@/pages/vendors/types'
 import { normalise, templateFor, type CategoryTemplate } from './categoryTemplates'
 import type { Quotation, QuotationDraft, QuotationItem, QuotationRequest } from './types'
 
@@ -84,6 +85,18 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
   const [aiFields, setAiFields] = useState<Set<AiField>>(new Set())
   const [aiMessage, setAiMessage] = useState('')
 
+  // every vendor in the request's category can quote, not only the ones invited so far
+  const categoryVendors = useQuery({
+    queryKey: ['vendors', 'for-request', request.category_id],
+    queryFn: ({ signal }) => get<Page<Vendor>>('/vendors/', { category_id: request.category_id, limit: 200 }, signal),
+  })
+  const invitedIds = new Set(request.invited_vendors.map((v) => v.id))
+  const receivedIds = new Set(request.invited_vendors.filter((v) => v.received).map((v) => v.id))
+  const vendorOptions = [
+    ...request.invited_vendors.map((v) => ({ id: v.id, name: v.name })),
+    ...(categoryVendors.data?.results ?? []).filter((v) => !invitedIds.has(v.id)).map((v) => ({ id: v.id, name: v.name })),
+  ]
+
   // a row counts once a price is typed in it
   const filledLines = lines.filter((l) => l.description.trim() && l.price.trim() !== '')
   const itemsTotal = filledLines.reduce((sum, l) => sum + (Number(l.qty) || 0) * rupeesToPaise(l.price), 0)
@@ -122,7 +135,7 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
     },
     onSuccess: (draft) => {
       const filled = new Set<AiField>()
-      const match = request.invited_vendors.find(
+      const match = vendorOptions.find(
         (v) => draft.vendor_name && v.name.toLowerCase().includes(draft.vendor_name.toLowerCase().split(' ')[0]),
       )
       if (match && !vendor) {
@@ -272,14 +285,20 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
             edited('vendor')
           }}
         >
-          <option value="">Choose…</option>
-          {request.invited_vendors.map((v) => (
+          <option value="">{categoryVendors.isLoading ? 'Loading vendors…' : 'Choose…'}</option>
+          {vendorOptions.map((v) => (
             <option key={v.id} value={v.id}>
               {v.name}
-              {v.received && !quotation ? ' (already quoted — will replace)' : ''}
+              {receivedIds.has(v.id) && !quotation ? ' (already quoted — will replace)' : ''}
+              {!invitedIds.has(v.id) ? ' (not invited yet)' : ''}
             </option>
           ))}
         </Select>
+        {categoryVendors.error && (
+          <p role="alert" className="text-xs text-red-600 sm:col-span-3">
+            Could not load vendors: {categoryVendors.error.message}
+          </p>
+        )}
         {template.perPlate && (
           <Input
             label="Price per plate (₹)"
@@ -312,13 +331,23 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
             {request.category_name} pricing{' '}
             <span className="font-normal text-slate-500">· fill in what the vendor quoted, leave the rest empty</span>
           </span>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setLines((l) => [...l, { description: '', qty: '1', price: '', unit: 'qty', preset: false }])}
-          >
-            + Add custom item
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setLines(buildLines(template, filledLines.map((l) => ({ description: l.description, qty: Number(l.qty) || 1, unit_price_paise: rupeesToPaise(l.price) })), request.guest_count))}
+              title="Bring back the standard rows you deleted"
+            >
+              Restore standard items
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setLines((l) => [...l, { description: '', qty: '1', price: '', unit: 'qty', preset: false }])}
+            >
+              + Add custom item
+            </Button>
+          </div>
         </div>
         <div className={cn('space-y-2 rounded-lg p-2', mark('items'))}>
           <div className="hidden grid-cols-[1fr_6rem_7rem_6rem_1.5rem] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
@@ -331,7 +360,7 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
           {lines.map((line, index) => {
             const amount = (Number(line.qty) || 0) * rupeesToPaise(line.price)
             return (
-              <div key={index} className="grid grid-cols-[1fr_5rem_6rem] items-center gap-2 sm:grid-cols-[1fr_6rem_7rem_6rem_1.5rem]">
+              <div key={index} className="grid grid-cols-[1fr_5rem_6rem_1.5rem] items-center gap-2 sm:grid-cols-[1fr_6rem_7rem_6rem_1.5rem]">
                 {line.preset ? (
                   <span className="text-sm text-slate-700">
                     {line.description} <span className="text-xs text-slate-400">({line.unit})</span>
@@ -373,18 +402,15 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
                 />
                 <span className="hidden text-right text-sm text-slate-600 sm:block">{line.price.trim() ? formatINR(amount) : '—'}</span>
-                {line.preset ? (
-                  <span className="hidden sm:block" />
-                ) : (
-                  <button
-                    type="button"
-                    aria-label={`Remove custom item ${index + 1}`}
-                    onClick={() => setLines((l) => l.filter((_, i) => i !== index))}
-                    className="px-1 text-slate-400 hover:text-red-600"
-                  >
-                    ✕
-                  </button>
-                )}
+                <button
+                  type="button"
+                  aria-label={`Delete ${line.description || `item ${index + 1}`}`}
+                  title="Delete this item"
+                  onClick={() => setLines((l) => l.filter((_, i) => i !== index))}
+                  className="rounded px-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                >
+                  ✕
+                </button>
               </div>
             )
           })}

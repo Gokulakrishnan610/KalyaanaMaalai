@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import { useDeferredValue, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { get, type Page } from '@/api/client'
-import { Badge, Button, Card, EmptyState, ErrorState, Spinner, Table, Td, Th, cn } from '@/components/common'
+import { Badge, Button, Card, EmptyState, ErrorState, SearchBox, Spinner, Table, Td, Th, cn } from '@/components/common'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Stars } from './Stars'
 import type { Vendor } from './types'
 import { VendorForm } from './VendorForm'
@@ -18,21 +19,20 @@ export default function VendorsPage() {
   const [page, setPage] = useState(1)
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState('')
-  const q = useDeferredValue(search)
-  const cityFilter = useDeferredValue(city)
+  // wait until typing pauses before asking the server
+  const q = useDebouncedValue(search.trim())
+  const cityFilter = useDebouncedValue(city.trim())
   const { data: categories } = useVendorCategories()
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['vendors', { q, cityFilter, categoryId, page }],
-    queryFn: () =>
-      get<Page<Vendor>>('/vendors/', {
-        q: q || undefined,
-        city: cityFilter || undefined,
-        category_id: categoryId ?? undefined,
-        page,
-        limit: PAGE_SIZE,
-      }),
-    placeholderData: (previous) => previous,
+    queryFn: ({ signal }) =>
+      get<Page<Vendor>>(
+        '/vendors/',
+        { q: q || undefined, city: cityFilter || undefined, category_id: categoryId ?? undefined, page, limit: PAGE_SIZE },
+        signal,
+      ),
+    placeholderData: keepPreviousData,
   })
 
   const resetPage = <T,>(setter: (v: T) => void) => (value: T) => {
@@ -72,19 +72,21 @@ export default function VendorsPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input
-          aria-label="Search vendors"
+        <SearchBox
+          label="Search vendors"
           placeholder="Search name, contact or phone"
           value={search}
-          onChange={(e) => resetPage(setSearch)(e.target.value)}
-          className="w-64 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          onChange={resetPage(setSearch)}
+          busy={search.trim() !== q || (isFetching && !!q)}
+          className="w-64"
         />
-        <input
-          aria-label="Filter by city"
+        <SearchBox
+          label="Filter by city"
           placeholder="City"
           value={city}
-          onChange={(e) => resetPage(setCity)(e.target.value)}
-          className="w-40 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          onChange={resetPage(setCity)}
+          busy={city.trim() !== cityFilter}
+          className="w-44"
         />
         <div className="ml-auto flex overflow-hidden rounded-lg border border-slate-300 text-sm">
           {(['cards', 'table'] as const).map((v) => (

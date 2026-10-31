@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
-import { useDeferredValue, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EmptyState, ErrorState, Spinner, Table, Td, Th } from '@/components/common'
+import { EmptyState, ErrorState, SearchBox, Spinner, Table, Td, Th } from '@/components/common'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { get, type Page } from '@/api/client'
 import { formatDate } from '@/helpers/date'
 
@@ -18,10 +19,11 @@ export interface Client {
 
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
-  const deferred = useDeferredValue(search)
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['clients', deferred],
-    queryFn: () => get<Page<Client>>('/clients/', { q: deferred || undefined, page_size: 100 }),
+  const debounced = useDebouncedValue(search.trim())
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ['clients', debounced],
+    queryFn: ({ signal }) => get<Page<Client>>('/clients/', { q: debounced || undefined, page_size: 100 }, signal),
+    placeholderData: keepPreviousData,
   })
 
   return (
@@ -29,12 +31,13 @@ export default function ClientsPage() {
       <h1 className="text-2xl font-semibold">Clients</h1>
       <p className="mb-5 text-sm text-slate-500">Couples who have booked with us. New clients appear when an enquiry is converted.</p>
 
-      <input
-        aria-label="Search clients"
-        placeholder="Search name, phone or city"
+      <SearchBox
+        label="Search clients"
+        placeholder="Search name, email, phone or city"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-72 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+        onChange={setSearch}
+        busy={search.trim() !== debounced || isFetching}
+        className="mb-4"
       />
 
       {isLoading && <Spinner />}

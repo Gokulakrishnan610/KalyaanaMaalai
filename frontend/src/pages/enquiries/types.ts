@@ -27,7 +27,9 @@ export interface Enquiry {
   preferred_contact: string
   profile_complete: boolean
   client: number | null
-  client_name: string | null
+  linked_client_name: string | null
+  client_name: string
+  spouse_email: string
   owner: number | null
   owner_name: string | null
   created_at: string

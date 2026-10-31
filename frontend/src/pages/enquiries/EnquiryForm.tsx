@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { z } from 'zod'
 import { Button, Input, Modal, Select } from '@/components/common'
-import { ApiError, patch, post, remove } from '@/api/client'
+import { ApiError, get, patch, post, remove } from '@/api/client'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { fromLocalInput, toLocalInput } from '@/helpers/date'
 import { paiseToRupees, rupeesToPaise } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
@@ -14,7 +15,9 @@ import { StarRating } from './StarRating'
 import { CONTACT_LABELS, LOST_REASONS, SOURCES, STAGE_WIN_CHANCE, STATUSES, WEBSITE_FUNCTIONS, WEBSITE_SERVICES, type Enquiry, type Status } from './types'
 
 const schema = z.object({
-  couple_name: z.string().min(1, 'Enter the couple’s name'),
+  client_name: z.string(),
+  partner_name: z.string(),
+  spouse_email: z.string().email('Enter a valid email').or(z.literal('')),
   phone: z.string().regex(/^\d{10}$/, 'Enter a 10-digit phone number'),
   email: z.string().email('Enter a valid email').or(z.literal('')),
   source: z.string().min(1),
@@ -57,7 +60,9 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      couple_name: enquiry?.couple_name ?? '',
+      client_name: enquiry?.client_name ?? '',
+      partner_name: enquiry?.partner_name ?? '',
+      spouse_email: enquiry?.spouse_email ?? '',
       phone: enquiry?.phone ?? '',
       email: enquiry?.email ?? '',
       source: enquiry?.source ?? 'CALL',
@@ -78,10 +83,33 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['enquiries'] })
 
+  // a client is recognised by client name + email: say so when this person is already one of ours
+  const typedName = useDebouncedValue(watch('client_name').trim(), 400)
+  const typedEmail = useDebouncedValue(watch('email').trim(), 400)
+  const knownClient = useQuery({
+    queryKey: ['client-lookup', typedName, typedEmail],
+    queryFn: ({ signal }) =>
+      get<{ client: { id: number; couple_name: string; spouse_name: string } | null }>(
+        '/clients/lookup/',
+        { client_name: typedName, email: typedEmail },
+        signal,
+      ),
+    enabled: !enquiry?.client && typedName !== '' && /\S+@\S+\.\S+/.test(typedEmail),
+    placeholderData: keepPreviousData,
+  })
+  const existingClient = knownClient.data?.client
+
   const save = useMutation({
     mutationFn: (v: FormValues) => {
+      if (!v.client_name.trim() && !enquiry?.couple_name) throw new ApiError(400, 'Enter the client’s name', { client_name: 'Enter the client’s name' })
+      const clientName = v.client_name.trim()
+      const spouse = v.partner_name.trim()
       const body = {
-        couple_name: v.couple_name,
+        client_name: clientName,
+        partner_name: spouse,
+        spouse_email: v.spouse_email,
+        // how the couple is shown in lists: "Client & Spouse" (an older enquiry without a client name keeps its own)
+        couple_name: clientName ? [clientName, spouse].filter(Boolean).join(' & ') : enquiry?.couple_name ?? '',
         phone: v.phone,
         email: v.email,
         source: v.source,
@@ -107,7 +135,7 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
     onError: (e) => {
       if (!(e instanceof ApiError)) return setMessage('Could not reach the server')
       setMessage(e.message)
-      const names: Record<string, keyof FormValues> = { budget_paise: 'budget', expected_revenue_paise: 'expected_fee' }
+      const names: Record<string, keyof FormValues> = { budget_paise: 'budget', expected_revenue_paise: 'expected_fee', couple_name: 'client_name' }
       for (const [field, text] of Object.entries(e.fields)) {
         const name = names[field] ?? (field as keyof FormValues)
         if (name in schema.shape) setError(name, { message: text })
@@ -142,9 +170,17 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
     <Modal open title={enquiry ? enquiry.couple_name : 'New enquiry'} onClose={onClose} wide>
       <form onSubmit={handleSubmit((v) => save.mutate(v))} noValidate className="space-y-4">
         <fieldset disabled={!canEdit} className="grid gap-4 sm:grid-cols-2">
-          <Input label="Couple" error={errors.couple_name?.message} {...register('couple_name')} />
-          <Input label="Phone" inputMode="numeric" maxLength={10} error={errors.phone?.message} {...register('phone')} />
-          <Input label="Email" type="email" error={errors.email?.message} {...register('email')} />
+          <Input label="Client name" autoComplete="off" error={errors.client_name?.message} {...register('client_name')} />
+          <Input label="Client phone number" inputMode="numeric" maxLength={10} error={errors.phone?.message} {...register('phone')} />
+          <Input label="Client email ID" type="email" error={errors.email?.message} {...register('email')} />
+          <Input label="Spouse name" autoComplete="off" error={errors.partner_name?.message} {...register('partner_name')} />
+          <Input label="Spouse email ID" type="email" error={errors.spouse_email?.message} {...register('spouse_email')} />
+          {existingClient && (
+            <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 sm:col-span-2">
+              {existingClient.couple_name} is already our client (same name and email). This enquiry will be linked to them,
+              and no second client record will be created.
+            </p>
+          )}
           <Select label="How did they reach us?" {...register('source')}>
             {SOURCES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -155,7 +191,7 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
           <Input label="Wedding date" type="date" error={errors.wedding_date?.message} {...register('wedding_date')} />
           <Input label="Guests" type="number" min={1} error={errors.guest_count?.message} {...register('guest_count')} />
           <Input label="Budget (₹)" inputMode="decimal" error={errors.budget?.message} {...register('budget')} />
-          <Input label="City" {...register('venue_city')} />
+          <Input label="Wedding Destination" {...register('venue_city')} />
           <Input label="First consultation meeting" type="datetime-local" {...register('consultation_at')} />
           {enquiry && (
             <Select

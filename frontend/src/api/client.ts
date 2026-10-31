@@ -61,8 +61,9 @@ api.interceptors.response.use(
 )
 
 // Small helpers: `const page = await get<Page<Enquiry>>('/enquiries/', { status: 'NEW' })`
-export async function get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  return (await api.get<T>(url, { params })).data
+/** Pass react-query's `signal` as the third argument so a request that is no longer needed (an older search) is cancelled. */
+export async function get<T>(url: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+  return (await api.get<T>(url, { params, signal })).data
 }
 export async function post<T>(url: string, body?: unknown): Promise<T> {
   return (await api.post<T>(url, body)).data

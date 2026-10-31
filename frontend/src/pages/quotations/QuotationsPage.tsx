@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Fragment, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { get } from '@/api/client'
-import { Badge, Button, EmptyState, ErrorState, Spinner, Table, Td, Th } from '@/components/common'
+import { Badge, Button, EmptyState, ErrorState, SearchBox, Spinner, Table, Td, Th } from '@/components/common'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { formatDate } from '@/helpers/date'
 import { NewRequestForm } from './NewRequestForm'
 import type { QuotationRequest } from './types'
@@ -11,9 +12,12 @@ export default function QuotationsPage() {
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
   const [expanded, setExpanded] = useState<number | null>(null)
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['quotation-requests', 'all'],
-    queryFn: () => get<QuotationRequest[]>('/quotation-requests/'),
+  const [search, setSearch] = useState('')
+  const debounced = useDebouncedValue(search.trim())
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ['quotation-requests', 'all', debounced],
+    queryFn: ({ signal }) => get<QuotationRequest[]>('/quotation-requests/', { q: debounced || undefined }, signal),
+    placeholderData: keepPreviousData,
   })
 
   // one row per wedding, with that wedding's requirements (DJ, caterer, ...) inside it
@@ -37,11 +41,20 @@ export default function QuotationsPage() {
         <Button onClick={() => setCreating(true)}>+ New request</Button>
       </div>
 
+      <SearchBox
+        label="Search quotations"
+        placeholder="Search wedding, couple or requirement"
+        value={search}
+        onChange={setSearch}
+        busy={search.trim() !== debounced || isFetching}
+        className="mb-4"
+      />
+
       {isLoading && <Spinner />}
       {error && <ErrorState message={error.message} onRetry={refetch} />}
       {data && data.length === 0 && (
         <EmptyState
-          title="No quotation requests yet"
+          title={debounced ? "No matching requests" : "No quotation requests yet"}
           hint="Start one for a caterer, decorator or any other vendor type."
           action={<Button onClick={() => setCreating(true)}>+ New request</Button>}
         />
