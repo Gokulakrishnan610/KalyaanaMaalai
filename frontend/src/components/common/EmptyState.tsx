@@ -28,9 +28,9 @@ export function Emblem({ className = 'h-20 w-20' }: { className?: string }) {
 
 export function EmptyState({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-dashed border-brand-500/30 bg-white/80 py-12 text-center">
-      <div className="float mx-auto mb-3 w-fit opacity-90">
-        <Emblem />
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white py-12 text-center">
+      <div className="mx-auto mb-3 w-fit opacity-80">
+        <Emblem className="h-12 w-12" />
       </div>
       <p className="font-semibold text-slate-700">{title}</p>
       {hint && <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">{hint}</p>}

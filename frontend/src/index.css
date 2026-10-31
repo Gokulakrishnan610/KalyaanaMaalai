@@ -1,16 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  /* main accent: a warm rose, like the buttons in the design */
-  --color-brand-50: #fff1f3;
-  --color-brand-100: #ffe0e5;
-  --color-brand-500: #e5395c;
-  --color-brand-600: #d12349;
-  --color-brand-700: #b11a3b;
+  /* one accent colour, a deep wine. Neutrals (slate) carry the rest of the screen; the accent is kept for the main
+     action, the selected item and focus, so it stays meaningful. */
+  --color-brand-50: #fdf2f5;
+  --color-brand-100: #fbe4ea;
+  --color-brand-200: #f6c6d3;
+  --color-brand-500: #b4234a;
+  --color-brand-600: #9c1c40;
+  --color-brand-700: #821737;
+  --color-brand-800: #66122b;
 
-  /* dark sidebar */
-  --color-sidebar: #15111b;
-  --color-sidebar-hover: #241e2d;
+  /* dark sidebar: near-black, no tint */
+  --color-sidebar: #111318;
+  --color-sidebar-hover: #1c1f26;
 
   /* soft card colours used for the dashboard numbers */
   --color-peach: #fff0e8;
@@ -28,15 +31,19 @@ body,
 }
 
 body {
-  @apply bg-[#fbf8f6] text-slate-900 antialiased;
+  @apply bg-[#f6f7f9] text-slate-900 antialiased;
+  font-feature-settings: "cv11", "ss01";
 }
+
+/* numbers line up in columns (money, counts, dates) */
+table, .num { font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------
    Motion and graphics. Pure CSS, no extra libraries.
    Everything calms down for people who ask their system for less motion (see the end of the file).
    ------------------------------------------------------------------ */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(16px) scale(0.985); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes fade {
@@ -91,74 +98,27 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* the page content slides up on every screen change, and its blocks arrive one after another */
-.page-enter > * > *,
-.page-enter > :not(:only-child) {
-  animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
-}
-.page-enter .grid > * {
-  animation: rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: calc(120ms + var(--i, 0) * 55ms);
-}
-.page-enter tbody > tr {
-  animation: fade 0.5s ease-out both;
-  animation-delay: calc(150ms + var(--i, 0) * 35ms);
-}
-.page-enter > * > :nth-child(1), .page-enter > :not(:only-child):nth-child(1), .page-enter .grid > :nth-child(1), .page-enter tbody > :nth-child(1) { --i: 0; }
-.page-enter > * > :nth-child(2), .page-enter > :not(:only-child):nth-child(2), .page-enter .grid > :nth-child(2), .page-enter tbody > :nth-child(2) { --i: 1; }
-.page-enter > * > :nth-child(3), .page-enter > :not(:only-child):nth-child(3), .page-enter .grid > :nth-child(3), .page-enter tbody > :nth-child(3) { --i: 2; }
-.page-enter > * > :nth-child(4), .page-enter > :not(:only-child):nth-child(4), .page-enter .grid > :nth-child(4), .page-enter tbody > :nth-child(4) { --i: 3; }
-.page-enter > * > :nth-child(5), .page-enter > :not(:only-child):nth-child(5), .page-enter .grid > :nth-child(5), .page-enter tbody > :nth-child(5) { --i: 4; }
-.page-enter > * > :nth-child(6), .page-enter > :not(:only-child):nth-child(6), .page-enter .grid > :nth-child(6), .page-enter tbody > :nth-child(6) { --i: 5; }
-.page-enter > * > :nth-child(n + 7), .page-enter > :not(:only-child):nth-child(n + 7), .page-enter .grid > :nth-child(n + 7), .page-enter tbody > :nth-child(n + 7) { --i: 6; }
-.page-enter .grid > :nth-child(n + 9) { --i: 7; }
-
-/* headings get a soft rose gradient that slowly moves */
-.page-enter h1 {
-  background: linear-gradient(90deg, #15111b 0%, #b11a3b 45%, #15111b 90%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both, gradient-pan 9s linear infinite;
-}
+/* page titles: plain and dark, like any professional tool */
+.page-enter h1 { letter-spacing: -0.015em; }
 
 /* cards that can be clicked rise towards you */
 .lift {
   transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
 }
 .lift:hover {
-  transform: translateY(-5px);
-  border-color: rgb(229 57 92 / 0.35);
-  box-shadow: 0 18px 32px -14px rgb(177 26 59 / 0.28);
+  border-color: rgb(148 163 184 / 0.7);
+  box-shadow: 0 4px 12px -4px rgb(15 23 42 / 0.12);
 }
 
-/* primary buttons: a light sweeps across on hover, and they press in when clicked */
-.btn {
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.25s ease, background-color 0.2s ease;
-}
-.btn:not(:disabled):hover { transform: translateY(-1px); }
-.btn:not(:disabled):active { transform: translateY(0) scale(0.96); }
-.btn-primary:not(:disabled):hover { box-shadow: 0 8px 18px -6px rgb(229 57 92 / 0.55); }
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.35), transparent);
-  transform: translateX(-130%) skewX(-20deg);
-  pointer-events: none;
-}
-.btn-primary:not(:disabled):hover::after { animation: sheen 0.8s ease; }
+/* buttons press in slightly when clicked */
+.btn { transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
+.btn:not(:disabled):active { transform: scale(0.98); }
 
-.modal-backdrop { animation: fade 0.2s ease-out both; backdrop-filter: blur(3px); }
-.modal-card { animation: pop 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.1) both; }
+.modal-backdrop { animation: fade 0.15s ease-out both; }
+.modal-card { animation: rise 0.2s ease-out both; }
 
 .skeleton {
-  background: linear-gradient(90deg, #f1ebe6 25%, #fbf8f6 50%, #f1ebe6 75%);
+  background: linear-gradient(90deg, #eef0f3 25%, #f6f7f9 50%, #eef0f3 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
@@ -183,6 +143,9 @@ body {
 
 .float { animation: float 6s ease-in-out infinite; }
 .twinkle { animation: twinkle 3s ease-in-out infinite; }
+/* inside the working screens decorations stay still */
+.app-shell .float, .app-shell .twinkle { animation: none; }
+.app-shell .aurora { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

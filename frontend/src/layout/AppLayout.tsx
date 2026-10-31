@@ -22,17 +22,19 @@ import { LiveStatus } from '@/live/LiveStatus'
 import { useLogin } from '@/login/LoginContext'
 import { NotificationBell } from '@/pages/notifications/NotificationBell'
 
-const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; group?: string }
+// grouped like the work itself: winning couples, running weddings, money, and the system's messages
+const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/enquiries', label: 'Enquiries', icon: MessageCircle },
+  { to: '/enquiries', label: 'Enquiries', icon: MessageCircle, group: 'Sales' },
   { to: '/clients', label: 'Clients', icon: Users },
-  { to: '/weddings', label: 'Weddings', icon: CalendarHeart },
+  { to: '/weddings', label: 'Weddings', icon: CalendarHeart, group: 'Weddings' },
   { to: '/vendors', label: 'Vendors', icon: Store },
   { to: '/quotations', label: 'Quotations', icon: FileText },
   { to: '/incidents', label: 'Incidents', icon: TriangleAlert },
-  { to: '/payments', label: 'Payments', icon: Wallet },
+  { to: '/payments', label: 'Payments', icon: Wallet, group: 'Money' },
   { to: '/agreements', label: 'Agreements', icon: FileSignature },
-  { to: '/emails', label: 'Emails', icon: Mail },
+  { to: '/emails', label: 'Emails', icon: Mail, group: 'Messages' },
   { to: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -60,7 +62,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="relative isolate flex h-full">
+    <div className="app-shell relative isolate flex h-full">
       {/* soft drifting colour behind everything */}
       <div className="aurora pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <span className="-left-24 top-10 h-96 w-96 bg-brand-100" />
@@ -69,12 +71,11 @@ export function AppLayout() {
       </div>
       <aside
         className={cn(
-          'relative flex flex-col overflow-hidden bg-gradient-to-b from-sidebar via-sidebar to-[#2a1530] text-slate-300 transition-[width] duration-300 ease-out',
-          collapsed ? 'w-[72px]' : 'w-64',
+          'relative flex flex-col overflow-y-auto border-r border-black/20 bg-sidebar text-slate-400 transition-[width] duration-200 ease-out',
+          collapsed ? 'w-[68px]' : 'w-60',
         )}
       >
-        <div className="pointer-events-none absolute -bottom-16 -left-10 h-48 w-48 rounded-full bg-brand-500/20 blur-3xl" aria-hidden="true" />
-        <div className={cn('flex items-center px-4', collapsed ? 'flex-col gap-1 py-3' : 'h-16 justify-between')}>
+        <div className={cn('flex items-center px-4', collapsed ? 'flex-col gap-1 py-3' : 'h-14 justify-between')}>
           {/* the logo always leads back to the homepage, from every screen */}
           <Link
             to="/"
@@ -82,7 +83,7 @@ export function AppLayout() {
             title="Go to the homepage"
             className="group flex items-center gap-2.5 rounded-xl leading-tight outline-offset-4"
           >
-            <Emblem className="float h-9 w-9 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+            <Emblem className="h-8 w-8 shrink-0" />
             {!collapsed && (
               <div>
                 <div className="font-semibold tracking-wide text-white">KalyaanaMaalai</div>
@@ -98,37 +99,39 @@ export function AppLayout() {
             <Menu size={18} />
           </button>
         </div>
-        <nav className="flex-1 space-y-1 px-3 py-3">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              title={label}
-              className={({ isActive }) =>
-                cn(
-                  'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-md shadow-brand-500/30'
-                    : 'hover:translate-x-1 hover:bg-sidebar-hover hover:text-white',
-                  collapsed && 'justify-center',
-                )
-              }
-            >
-              <Icon size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-125 group-hover:-rotate-6" />
-              {!collapsed && label}
-            </NavLink>
+        <nav className="flex-1 px-3 pb-3">
+          {NAV.map(({ to, label, icon: Icon, end, group }) => (
+            <div key={to}>
+              {group && (collapsed ? <div className="mx-2 my-3 border-t border-white/10" /> : (
+                <div className="px-3 pb-1.5 pt-5 text-[11px] font-medium uppercase tracking-wider text-slate-500">{group}</div>
+              ))}
+              <NavLink
+                to={to}
+                end={end}
+                title={label}
+                className={({ isActive }) =>
+                  cn(
+                    'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    isActive ? 'bg-white/10 text-white' : 'hover:bg-sidebar-hover hover:text-slate-100',
+                    collapsed && 'justify-center',
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />}
+                    <Icon size={17} className="shrink-0" />
+                    {!collapsed && label}
+                  </>
+                )}
+              </NavLink>
+            </div>
           ))}
         </nav>
-        {!collapsed && (
-          <div className="m-3 rounded-xl bg-sidebar-hover p-3 text-xs text-slate-400">
-            Planning weddings, one detail at a time.
-          </div>
-        )}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center gap-4 border-b border-slate-200/70 bg-white/80 px-6 backdrop-blur">
+        <header className="flex h-14 items-center gap-4 border-b border-slate-200 bg-white px-6">
           <form onSubmit={onSearch} className="relative max-w-md flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -136,14 +139,14 @@ export function AppLayout() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search couples by name or phone…"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100"
+              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100"
             />
           </form>
           <div className="ml-auto flex items-center gap-4">
             <LiveStatus />
             <NotificationBell />
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
                 {initials(user?.name)}
               </div>
               <div className="hidden text-sm leading-tight sm:block">
@@ -154,7 +157,7 @@ export function AppLayout() {
             <button
               aria-label="Log out"
               title="Log out"
-              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               onClick={() => {
                 logout()
                 navigate('/login')
@@ -164,9 +167,9 @@ export function AppLayout() {
             </button>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
           {/* keyed by address, so every screen change replays the entrance animation */}
-          <div key={location.pathname} className="page-enter">
+          <div key={location.pathname} className="page-enter mx-auto max-w-[1400px]">
             <Outlet />
           </div>
         </main>
