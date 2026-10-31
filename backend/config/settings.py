@@ -147,6 +147,8 @@ EMAIL_HOST = env("SMTP_HOST")
 EMAIL_PORT = int(env("SMTP_PORT", "587"))
 EMAIL_HOST_USER = env("SMTP_USER")
 EMAIL_HOST_PASSWORD = env("SMTP_PASS")
+EMAIL_USE_TLS = EMAIL_PORT == 587  # Mailtrap and most providers want STARTTLS on 587
+EMAIL_TIMEOUT = 10
 EMAIL_BACKEND = (
     "django.core.mail.backends.console.EmailBackend"
     if MOCK_EXTERNALS or not EMAIL_HOST
