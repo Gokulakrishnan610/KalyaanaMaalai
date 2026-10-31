@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 
 class PayStatus(models.TextChoices):
@@ -72,8 +73,8 @@ class Payment(models.Model):
     amount_paise = models.BigIntegerField()
     method = models.CharField(max_length=20)  # cash, UPI, bank, card, Razorpay
     reference = models.CharField(max_length=120, blank=True)
-    paid_at = models.DateTimeField(auto_now_add=True)
-    # lets the website retry a payment safely without recording it twice
+    paid_at = models.DateTimeField(default=timezone.now)
+    # the Idempotency-Key sent by the website (or "razorpay:<payment id>"): a retry returns the first payment
     retry_key = models.CharField(max_length=80, null=True, blank=True, unique=True)
 
     class Meta:

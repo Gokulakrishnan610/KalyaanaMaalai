@@ -8,4 +8,6 @@ Use `minutes` for "every N minutes" or `hour` for "every day at that hour (UTC)"
 
 JOBS: list[dict] = [
     {"function": "weddings.jobs.mark_late_vendors", "minutes": 1},
+    # "run_at_start": also run once when `run_jobs` starts, so a fresh dev setup shows alerts straight away
+    {"function": "payments.jobs.remind_due_payments", "hour": 9, "run_at_start": True},
 ]

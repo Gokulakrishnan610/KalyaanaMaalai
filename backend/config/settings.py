@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -120,6 +121,7 @@ SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("LOGIN_MINUTES"
 
 FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173")
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL, "http://localhost:5173"]
+CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key"]  # lets the website retry a payment safely
 CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
 
 # --- Outside services. While MOCK_EXTERNALS is true they return fake answers, so the demo never breaks.
