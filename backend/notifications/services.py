@@ -17,7 +17,7 @@ CHANNELS = ("inapp", "telegram", "both")
 SEVERITIES = ("info", "warning", "critical")
 
 
-def _send_telegram(message: str, severity: str):
+def send_telegram_now(message: str, severity: str):
     token, chat_id = settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_CHAT_ID
     if settings.MOCK_EXTERNALS or not (token and chat_id):
         logger.info("[mock telegram] %s: %s", severity, message)
@@ -50,3 +50,17 @@ def notify(message: str, channel: str = "both", user_id: int | None = None, seve
     if channel in ("telegram", "both"):
         _send_telegram(message, severity)
     return notification
+
+
+def _send_telegram(message: str, severity: str):
+    """Hands the slow Telegram call to a Celery worker so the request that raised the alert is not held up.
+
+    If Redis or the worker is not available, it is sent right here instead, so the alert still goes out.
+    """
+    from notifications.tasks import send_telegram
+
+    try:
+        send_telegram.apply_async(args=(message, severity), retry=False)
+    except Exception:  # noqa: BLE001
+        logger.warning("Background queue unavailable, sending the Telegram message directly")
+        send_telegram_now(message, severity)

@@ -1,4 +1,4 @@
-"""Background jobs that run on a timer (`python manage.py run_jobs`).
+"""Background jobs that run on a timer (Celery beat, started with `make worker`).
 
 To add one, write a normal function in your own app and add a line below, e.g.
     {"function": "weddings.jobs.mark_late_vendors", "minutes": 1},
