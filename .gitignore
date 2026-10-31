@@ -27,3 +27,6 @@ backend/uploads/*
 .vscode/
 
 backend/staticfiles/
+
+# celery timer state
+backend/celerybeat-schedule*
