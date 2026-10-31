@@ -139,7 +139,7 @@ export default function EnquiriesPage() {
             <option value="">All sources</option>
             {SOURCES.map((s) => (
               <option key={s.value} value={s.value}>
-                {s.icon} {s.label}
+                {s.label}
               </option>
             ))}
           </Select>
@@ -221,7 +221,7 @@ export default function EnquiriesPage() {
                   )}
                 </Td>
                 <Td>
-                  {sourceInfo(e.source).icon} {sourceInfo(e.source).label}
+                  <span className="text-slate-600">{sourceInfo(e.source).label}</span>
                 </Td>
                 <Td>
                   <StatusSelect

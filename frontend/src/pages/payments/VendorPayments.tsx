@@ -100,9 +100,9 @@ export function VendorPayments({ weddingId, weddings, adding, onCloseAdd }: { we
                     </div>
                   </Td>
                   <Td>{bill.bill_ref || '-'}</Td>
-                  <Td className={bill.overdue ? 'font-medium text-red-600' : ''}>{formatDate(bill.due_date)}</Td>
-                  <Td className="text-right tabular-nums">{formatINR(bill.amount_paise)}</Td>
-                  <Td className="text-right font-medium tabular-nums">{formatINR(bill.remaining_paise)}</Td>
+                  <Td className={bill.overdue ? 'whitespace-nowrap font-medium text-red-600' : 'whitespace-nowrap'}>{formatDate(bill.due_date)}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums">{formatINR(bill.amount_paise)}</Td>
+                  <Td className="whitespace-nowrap text-right font-medium tabular-nums">{formatINR(bill.remaining_paise)}</Td>
                   <Td>
                     <StatusBadge status={bill.status} overdue={bill.overdue} />
                   </Td>
@@ -134,9 +134,9 @@ export function VendorPayments({ weddingId, weddings, adding, onCloseAdd }: { we
                       <Td />
                       <Td className="pl-6">{part.part_label} payment</Td>
                       <Td />
-                      <Td className={part.overdue ? 'font-medium text-red-600' : ''}>{formatDate(part.due_date)}</Td>
-                      <Td className="text-right tabular-nums">{formatINR(part.amount_paise)}</Td>
-                      <Td className="text-right tabular-nums">{formatINR(part.remaining_paise)}</Td>
+                      <Td className={part.overdue ? 'whitespace-nowrap font-medium text-red-600' : 'whitespace-nowrap'}>{formatDate(part.due_date)}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{formatINR(part.amount_paise)}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{formatINR(part.remaining_paise)}</Td>
                       <Td>
                         <StatusBadge status={part.status} overdue={part.overdue} />
                       </Td>

@@ -243,7 +243,7 @@ function Bar({ label, value, max, text, hint }: { label: string; value: number |
         <span className="text-slate-600">{value == null ? 'No data yet' : text}</span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-slate-100" role="meter" aria-label={label} aria-valuenow={value ?? 0} aria-valuemax={max}>
-        <div className="bar-grow h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500" style={{ width: `${percent}%` }} />
+        <div className="bar-grow h-full rounded-full bg-brand-600" style={{ width: `${percent}%` }} />
       </div>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>

@@ -40,7 +40,7 @@ function Card({ enquiry, canEdit, onOpen }: { enquiry: Enquiry; canEdit: boolean
       <div className="font-medium">{enquiry.couple_name}</div>
       <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
         <span title={source.label}>
-          {source.icon} {source.label}
+          {source.label}
         </span>
         {enquiry.guest_count && <span>{enquiry.guest_count} guests</span>}
       </div>

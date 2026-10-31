@@ -184,7 +184,7 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
           <Select label="How did they reach us?" {...register('source')}>
             {SOURCES.map((s) => (
               <option key={s.value} value={s.value}>
-                {s.icon} {s.label}
+                {s.label}
               </option>
             ))}
           </Select>

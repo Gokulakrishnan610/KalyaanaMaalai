@@ -64,7 +64,7 @@ export default function ClientPage() {
                 <span className="text-slate-500">
                   {formatDate(w.start_date)} · {w.city} · {w.guest_count} guests
                 </span>
-                <Badge tone="brand">{w.status}</Badge>
+                <Badge tone={w.status === 'COMPLETED' ? 'green' : w.status === 'CANCELLED' ? 'red' : 'blue'}>{w.status.charAt(0) + w.status.slice(1).toLowerCase()}</Badge>
               </li>
             ))}
           </ul>
@@ -80,7 +80,7 @@ export default function ClientPage() {
             {client.enquiries.map((e) => (
               <li key={e.id} className="flex items-center justify-between py-2">
                 <span>
-                  {sourceInfo(e.source).icon} {sourceInfo(e.source).label}
+                  {sourceInfo(e.source).label}
                 </span>
                 <span className="text-slate-500">{formatDate(e.created_at)}</span>
                 <Badge tone={statusInfo(e.status).tone}>{statusInfo(e.status).label}</Badge>

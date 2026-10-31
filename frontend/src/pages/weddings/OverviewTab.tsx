@@ -1,9 +1,9 @@
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { get } from '@/api/client'
 import { Badge, Card, CardTitle } from '@/components/common'
 import { formatDate } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
-import { financeAvailable, Placeholder, vendorsAvailable } from './Guarded'
 import { ROLE_LABELS, type Checkin, type WeddingDetail } from './types'
 
 interface Progress {
@@ -55,12 +55,12 @@ export function OverviewTab({ wedding }: { wedding: WeddingDetail }) {
     queryKey: ['checkins', wedding.id],
     queryFn: () => get<Checkin[]>(`/weddings/${wedding.id}/checkins/`),
   })
-  // Member 4's payment summary; any error (not built yet) just shows the placeholder
-  const payments = useQuery({
-    queryKey: ['payment-summary', wedding.id],
-    queryFn: () => get<Record<string, number>>(`/weddings/${wedding.id}/payment-summary/`),
-    enabled: financeAvailable,
-    retry: false,
+  const money = useQuery({
+    queryKey: ['wedding-finance', wedding.id],
+    queryFn: () =>
+      get<{ revenue: { invoiced: number; received: number; outstanding: number }; expenses: { planned: number; paid: number; outstanding: number }; estimated_profit: number; margin_pct: number | null }>(
+        `/weddings/${wedding.id}/finance/`,
+      ),
   })
 
   const arrived = checkins.data?.filter((c) => c.status !== 'PENDING' || c.actual_arrival).length ?? 0
@@ -112,34 +112,36 @@ export function OverviewTab({ wedding }: { wedding: WeddingDetail }) {
 
       <Card>
         <CardTitle>Vendors</CardTitle>
-        {vendorsAvailable ? (
-          <p className="text-sm text-slate-600">Open the Vendors tab for quotes and bookings.</p>
-        ) : (
-          <p className="text-sm text-slate-500">The Vendors module is not merged yet.</p>
-        )}
+        <p className="text-sm text-slate-600">Open the Vendors tab for quotes and bookings.</p>
         <p className="mt-2 text-sm">
           Arrival check-ins: {arrived} of {checkins.data?.length ?? 0} arrived
-          {late > 0 && <Badge tone="red">{late} late</Badge>}
+          {late > 0 && <span className="ml-2"><Badge tone="red">{late} late</Badge></span>}
         </p>
       </Card>
 
-      <div className="lg:col-span-2">
-        {financeAvailable && payments.data ? (
-          <Card>
-            <CardTitle>Payments</CardTitle>
-            <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-              {Object.entries(payments.data).map(([key, value]) => (
-                <div key={key}>
-                  <dt className="text-slate-500">{key.replace(/_paise$/, '').replace(/_/g, ' ')}</dt>
-                  <dd className="font-medium">{key.endsWith('_paise') ? formatINR(value) : value}</dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
+      <Card className="lg:col-span-2">
+        <div className="mb-3 flex items-center justify-between">
+          <CardTitle className="mb-0">Money</CardTitle>
+          <Link to="/payments" className="text-xs font-medium text-brand-600 hover:text-brand-700">Open payments</Link>
+        </div>
+        {!money.data ? (
+          <p className="text-sm text-slate-500">Loading…</p>
         ) : (
-          <Placeholder title="The payment summary" />
+          <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            {[
+              ['Invoiced to the couple', formatINR(money.data.revenue.invoiced)],
+              ['Received', formatINR(money.data.revenue.received)],
+              ['Owed to vendors', formatINR(money.data.expenses.outstanding)],
+              ['Expected profit', `${formatINR(money.data.estimated_profit)}${money.data.margin_pct !== null ? ` (${money.data.margin_pct}%)` : ''}`],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs text-slate-500">{label}</dt>
+                <dd className="num mt-1 text-base font-semibold text-slate-900">{value}</dd>
+              </div>
+            ))}
+          </dl>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

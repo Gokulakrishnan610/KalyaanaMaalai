@@ -87,9 +87,13 @@ function Column({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${stage}` })
   const [title, setTitle] = useState('')
-  const shown = tasks.filter((t) => visibleIds.has(t.id))
+  const [expanded, setExpanded] = useState(false)
+  const matching = tasks.filter((t) => visibleIds.has(t.id))
+  // long columns show the first few cards; the rest are one click away
+  const LIMIT = 6
+  const shown = expanded ? matching : matching.slice(0, LIMIT)
   return (
-    <div ref={setNodeRef} className={cn('w-72 shrink-0 rounded-xl bg-slate-100 p-3', isOver && 'ring-2 ring-brand-500')}>
+    <div ref={setNodeRef} className={cn('min-w-64 flex-1 rounded-xl border border-slate-200 bg-slate-50 p-3', isOver && 'ring-2 ring-brand-500')}>
       <div className="mb-3 flex items-center justify-between text-sm font-semibold text-slate-700">
         {label}
         <span className="rounded-full bg-white px-2 text-xs font-medium text-slate-500">{tasks.length}</span>
@@ -101,6 +105,11 @@ function Column({
           ))}
         </div>
       </SortableContext>
+      {matching.length > LIMIT && (
+        <button type="button" onClick={() => setExpanded((e) => !e)} className="mt-2 w-full rounded-lg py-1.5 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-900">
+          {expanded ? 'Show less' : `Show ${matching.length - LIMIT} more`}
+        </button>
+      )}
       {canEdit && (
         <form
           className="mt-3"

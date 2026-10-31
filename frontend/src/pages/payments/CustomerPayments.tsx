@@ -89,12 +89,12 @@ export function CustomerPayments({ weddingId, weddings, adding, onCloseAdd }: { 
                   <div>{invoice.type_label}</div>
                   {invoice.note && <div className="max-w-[14rem] truncate text-xs text-slate-500">{invoice.note}</div>}
                 </Td>
-                <Td className={invoice.overdue ? 'font-medium text-red-600' : ''}>{formatDate(invoice.due_date)}</Td>
-                <Td className="text-right tabular-nums">
+                <Td className={invoice.overdue ? 'whitespace-nowrap font-medium text-red-600' : 'whitespace-nowrap'}>{formatDate(invoice.due_date)}</Td>
+                <Td className="whitespace-nowrap text-right tabular-nums">
                   {formatINR(invoice.amount_paise)}
                   {invoice.paid_paise > 0 && <div className="text-xs text-emerald-600">{formatINR(invoice.paid_paise)} paid</div>}
                 </Td>
-                <Td className="text-right font-medium tabular-nums">{formatINR(invoice.remaining_paise)}</Td>
+                <Td className="whitespace-nowrap text-right font-medium tabular-nums">{formatINR(invoice.remaining_paise)}</Td>
                 <Td>
                   <StatusBadge status={invoice.status} overdue={invoice.overdue} />
                   {invoice.link?.status === 'ACTIVE' && (
