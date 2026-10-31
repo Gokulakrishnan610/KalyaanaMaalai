@@ -138,6 +138,18 @@ Set these environment variables: `ENVIRONMENT=production`, `SECRET_KEY` (long an
 
 Website (Vercel or Netlify): build command `npm run build`, folder `frontend`, output `dist`, environment variable `VITE_API_URL=https://your-backend-domain/api`.
 
+## Payments
+
+The **Payments** page has four numbers (still to collect, collected, still to pay vendors, expected profit) and three sections. Pick one wedding or all of them at the top. The same sections appear in the **Finance** tab of each wedding.
+
+- **From customers:** every invoice. Collect it two ways:
+  - **Payment link:** creates a private link (valid 1 to 30 days, for the full balance or a part). Copy it, or send it on WhatsApp or email. The customer opens it with no login, sees the couple, the amount and what is already paid, and pays online. The payment is then **recorded automatically**: the invoice, the totals, the dashboard and the planners' screens all update by themselves, and the customer gets a receipt.
+  - **Record payment:** for cash, UPI, bank transfer, cheque or card received offline. Choose the date and add a reference. Your name is saved on it.
+- **To vendors:** every vendor bill with its advance and final instalments (open the arrow). Vendors are paid offline, so use **Record payment**.
+- **History:** every payment in and out, newest first, showing whether it came through a link, online, or was entered by hand and by whom. A payment typed in by mistake can be undone here (the founder is told). Online payments cannot be undone here: refund them in Razorpay.
+
+Safety rules: a link is a long random token and shows nothing but the amount and who it is for; links expire and can be cancelled; paying twice records once; if the invoice is settled in cash while a customer is paying, the founder gets a "refund needed" alert. Nobody can type in an "online" payment by hand. The fake demo checkout only works in development, or when `ALLOW_DEMO_PAYMENTS=true`; with real Razorpay keys and `MOCK_EXTERNALS=false`, customers get the real checkout. For customers to open a link, the website must be reachable from the internet (deploy it, or use a tunnel while testing).
+
 ## Live updates (no refreshing)
 
 Open screens update by themselves. When anything changes, the backend publishes a small event to **Redis**, and every logged-in browser receives it over one open connection (**Server-Sent Events**, `GET /api/live/stream/`). The website then refreshes just the screens that event affects, and alerts appear as pop-ups. A green **Live** dot in the top bar shows the connection. If it drops, the website reconnects and catches up on what it missed.
