@@ -40,6 +40,13 @@ class DashboardTests(APITestCase):
         row = data["per_wedding"][0]
         self.assertEqual((row["margin_pct"], row["progress_pct"]), (40.0, 50))
 
+    def test_counts_and_activity_feed(self):
+        self.client.force_authenticate(self.founder)
+        data = self.client.get("/api/dashboard/summary/").data
+        self.assertEqual((data["total_weddings"], data["ongoing_weddings"]), (1, 1))
+        self.assertEqual((data["open_tasks"], data["overdue_tasks"]), (1, 0))
+        self.assertTrue(any(item["kind"] == "payment" for item in data["recent_activity"]))
+
     def test_upcoming_vendor_payment_shows_only_what_is_still_owed(self):
         self.client.force_authenticate(self.founder)
         bills = self.client.get("/api/dashboard/summary/").data["upcoming_vendor_payments"]

@@ -1,11 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #fdf2f4;
-  --color-brand-100: #fbe3e8;
-  --color-brand-500: #c2185b;
-  --color-brand-600: #a3144c;
-  --color-brand-700: #830f3d;
+  /* main accent: a warm rose, like the buttons in the design */
+  --color-brand-50: #fff1f3;
+  --color-brand-100: #ffe0e5;
+  --color-brand-500: #e5395c;
+  --color-brand-600: #d12349;
+  --color-brand-700: #b11a3b;
+
+  /* dark sidebar */
+  --color-sidebar: #15111b;
+  --color-sidebar-hover: #241e2d;
+
+  /* soft card colours used for the dashboard numbers */
+  --color-peach: #fff0e8;
+  --color-lavender: #f0ebfd;
+  --color-mint: #e5f6ee;
+  --color-sand: #fff4dc;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -16,5 +28,5 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-[#fbf8f6] text-slate-900 antialiased;
 }
