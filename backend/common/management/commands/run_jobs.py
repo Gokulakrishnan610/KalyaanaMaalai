@@ -19,6 +19,8 @@ class Command(BaseCommand):
             else:
                 scheduler.add_job(function, "cron", hour=job["hour"], id=job["function"])
             self.stdout.write(f"scheduled {job['function']}")
+            if job.get("run_at_start"):
+                function()
         if not JOBS:
             self.stdout.write("No jobs registered yet (see common/jobs.py).")
             return

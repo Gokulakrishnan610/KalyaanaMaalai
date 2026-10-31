@@ -6,4 +6,7 @@ To add one, write a normal function in your own app and add a line below, e.g.
 Use `minutes` for "every N minutes" or `hour` for "every day at that hour (UTC)".
 """
 
-JOBS: list[dict] = []
+JOBS: list[dict] = [
+    # "run_at_start": also run once when `run_jobs` starts, so a fresh dev setup shows alerts straight away
+    {"function": "payments.jobs.remind_due_payments", "hour": 9, "run_at_start": True},
+]

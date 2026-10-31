@@ -90,6 +90,34 @@ When you change a model: `cd backend && .venv/bin/python manage.py makemigration
 
 The dashboard reads the weddings, payments, tasks and vendor-arrival tables, so it fills up automatically as the other members' parts are built.
 
+## What works today (Member 4 part: money, AI and alerts)
+
+- **Finance tab** (`FinanceTab` in `frontend/src/pages/payments`, also the **Payments** page): revenue, expenses, estimated and actual profit, margin, budget charts, client invoices, vendor bills, advance/final instalments and the vendor payments due soon (overdue in red). Member 2: drop `<FinanceTab weddingId={wedding.id} />` into the wedding page.
+- **Invoices and payments:** a deposit, instalments, extra-guest charges (guests above the contract x the per-guest rate) and a final invoice. An invoice's status (unpaid / part paid / paid) is worked out from its payments. Paying more than is left is refused (409).
+- **Vendor bills:** the same vendor + bill reference twice is refused, and a bill with the same vendor and amount due within a week gives a warning. Vendor payments send an `Idempotency-Key`, so a double click or retry records one payment.
+- **Pay online (Razorpay test mode):** "Pay online" on an invoice. With `MOCK_EXTERNALS=true` it opens a demo checkout and no real money moves.
+- **AI:** `POST /api/ai/extract-quotation/` reads a vendor PDF or photo and returns a draft in paise (the form can edit it before saving); `POST /api/ai/generate-checklist/` previews 25-40 tasks tailored to the wedding and `.../confirm/` saves the ones you keep. If AI is off or fails, a built-in checklist is used. Components: `AIExtractModal` and `AIChecklistButton` in `frontend/src/pages/ai`.
+- **Alerts:** the bell in the top bar (refreshes every 30 s) and the Notifications page. `notifications.services.notify(message, severity=...)` saves an alert and sends it to Telegram when set up. `make jobs` also reminds you once a day about vendor payments due within 3 days or overdue.
+
+### Set up Telegram alerts (optional)
+
+1. In Telegram, message **@BotFather**, send `/newbot` and follow the steps. Copy the **token** it gives you.
+2. Open a chat with your new bot (or add it to a group) and send any message.
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and copy the number at `"chat":{"id": ...}`.
+4. In `.env` set `TELEGRAM_BOT_TOKEN=...`, `TELEGRAM_CHAT_ID=...` and `MOCK_EXTERNALS=false`, then restart the backend.
+
+While `MOCK_EXTERNALS=true` alerts only appear in the bell (and the server log).
+
+### Set up Razorpay test payments (optional)
+
+1. Create a free account at razorpay.com and switch the dashboard to **Test Mode**.
+2. Open Settings -> API Keys -> Generate Test Key. Put the two values in `.env` as `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, set `MOCK_EXTERNALS=false`, restart.
+3. In the test checkout use card `4111 1111 1111 1111` with any future expiry and any CVV, or UPI `success@razorpay`. "Record payment" always works as a manual fallback.
+
+### Set up AI (optional)
+
+Put `OPENAI_API_KEY` (and optionally `OPENAI_MODEL`, default `gpt-4o-mini`) in `.env` and set `MOCK_EXTERNALS=false`. Amounts are always converted to paise in our own code, and the totals are cross-checked against the line items.
+
 ## Putting it online (not tested yet)
 
 Backend (Render, Railway or similar), with a hosted Postgres:

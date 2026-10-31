@@ -11,6 +11,8 @@ class Notification(models.Model):
     channel = models.CharField(max_length=20, default="inapp")
     severity = models.CharField(max_length=20, default="info")
     read_at = models.DateTimeField(null=True, blank=True)
+    # lets a timed job send the same alert only once (e.g. "due:expense:7:2026-11-02")
+    dedupe_key = models.CharField(max_length=120, null=True, blank=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

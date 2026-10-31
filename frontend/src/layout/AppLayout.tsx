@@ -13,9 +13,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { cn } from '@/components/common'
 import { useLogin } from '@/login/LoginContext'
+import { NotificationBell } from '@/pages/notifications/NotificationBell'
 
 const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -108,12 +109,7 @@ export function AppLayout() {
             />
           </form>
           <div className="ml-auto flex items-center gap-4">
-            {/* Member 4 replaces this link with the live notification bell */}
-            <div id="notification-bell-slot">
-              <Link to="/notifications" aria-label="Notifications" className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100">
-                <Bell size={20} />
-              </Link>
-            </div>
+            <NotificationBell />
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
                 {initials(user?.name)}
