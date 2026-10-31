@@ -21,6 +21,11 @@ export interface Enquiry {
   expected_close_date: string | null
   lost_reason: LostReason | ''
   next_follow_up: string | null
+  partner_name: string
+  functions_wanted: string[]
+  services_needed: string[]
+  preferred_contact: string
+  profile_complete: boolean
   client: number | null
   client_name: string | null
   owner: number | null
@@ -84,3 +89,13 @@ export const FOLLOW_UP_KINDS: { value: FollowUp['kind']; label: string; icon: st
   { value: 'EMAIL', label: 'Email', icon: '✉️' },
   { value: 'TODO', label: 'To do', icon: '✅' },
 ]
+
+/** The couple's own answers from the customer website (labels for the codes the backend stores). */
+export const WEBSITE_SERVICES: Record<string, string> = {
+  VENUE: 'Venue', CATERING: 'Catering', DECOR: 'Decor and stage', PHOTOGRAPHY: 'Photo and video', MAKEUP: 'Makeup',
+  MUSIC: 'Music and DJ', MEHENDI: 'Mehendi', INVITATIONS: 'Invitations', TRANSPORT: 'Transport', STAY: 'Guest stay',
+}
+export const WEBSITE_FUNCTIONS: Record<string, string> = {
+  ENGAGEMENT: 'Engagement', MEHENDI: 'Mehendi', HALDI: 'Haldi', SANGEET: 'Sangeet', WEDDING: 'Wedding', RECEPTION: 'Reception',
+}
+export const CONTACT_LABELS: Record<string, string> = { CALL: 'Phone call', WHATSAPP: 'WhatsApp', EMAIL: 'Email' }
