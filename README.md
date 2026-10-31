@@ -45,7 +45,7 @@ docker compose up -d db redis
 python3 -m venv backend/.venv
 backend/.venv/bin/pip install -r backend/requirements.txt
 make reset-db        # creates all the tables
-make demo            # loads the Aarav & Meera demo data
+make demo            # loads the demo data (staff, vendors, couples, agreements, payments)
 make run             # backend at http://localhost:8000 (uvicorn: live updates need it)
 
 # 4. background jobs (second terminal): late-vendor alerts, payment reminders, Telegram
@@ -55,7 +55,17 @@ make worker
 cd frontend && npm install && npm run dev    # http://localhost:5173
 ```
 
-Demo logins (password `Demo@12345`): `founder@shaandaar.demo`, `planner@shaandaar.demo`, `staff@shaandaar.demo`.
+Demo logins (all use the password `Demo@12345`):
+
+| Who | Email | Where |
+|---|---|---|
+| Founder, planner, staff | `founder@`, `planner@`, `staff@shaandaar.demo` | main site, `localhost:5173` |
+| Couple with an agreement waiting to be signed | `nithilan.ramya@example.com` | customer site, `localhost:5174` (a pop-up asks them to sign; they also have two payments to make) |
+| Couple who already signed | `aarav.meera@example.com` | customer site |
+| Couple who just signed up on the website | `anjali.dev@example.com` | customer site |
+| Vendors | `rasoiroyale@vendors.demo`, `petalspillarsdecor@vendors.demo`, `royalmandapdecor@vendors.demo`, `djrhythmraj@vendors.demo` and others | main site login page (the two decorators have a quotation request to answer) |
+
+`make reset-db && make demo` (after `migrate`) wipes the database and loads all of this again.
 
 Handy pages while developing:
 - `http://localhost:8000/admin/`: see and edit every table (log in as the founder)

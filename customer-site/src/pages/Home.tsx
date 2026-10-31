@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { CalendarHeart, CheckCircle2, FileSignature, MessageCircle, Wallet } from 'lucide-react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, get, post, TOKEN_KEY } from '@/api/client'
@@ -33,6 +34,7 @@ export default function Home() {
 
   const me = useQuery({ queryKey: ['me'], queryFn: () => get<Portal>('/portal/me/'), enabled: loggedIn, refetchInterval: 20_000 })
   const agreements = useQuery({ queryKey: ['agreements'], queryFn: () => get<{ id: number; title: string; status: 'SENT' | 'SIGNED'; wedding_title: string }[]>('/portal/agreements/'), enabled: loggedIn && Boolean(me.data?.is_client) })
+  const [reminderClosed, setReminderClosed] = useState(() => sessionStorage.getItem('kmal_agreement_reminder') === 'closed')
   const invoices = useQuery({
     queryKey: ['invoices'],
     queryFn: () => get<InvoiceRow[]>('/portal/invoices/'),
@@ -48,6 +50,7 @@ export default function Home() {
   if (me.isLoading || !me.data) return <div className="p-10 text-center text-stone-500">Loading…</div>
   const d = me.data
   const v = d.profile.values
+  const waiting = agreements.data?.find((a) => a.status === 'SENT')
   const due = (invoices.data ?? []).filter((i) => i.remaining_paise > 0)
 
   return (
@@ -61,6 +64,20 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {waiting && !reminderClosed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4" role="dialog" aria-modal="true" aria-label="Agreement waiting for your signature">
+          <div className="w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gold-400/20 text-gold-500"><FileSignature size={28} /></div>
+            <h2 className="font-serif text-2xl text-maroon-900">One last step to confirm your booking</h2>
+            <p className="mt-2 text-sm text-stone-600">Your service agreement for <b>{waiting.wedding_title}</b> is ready. Please read it and sign it online. It takes about two minutes.</p>
+            <div className="mt-6 flex flex-col gap-2">
+              <LinkButton to={`/agreement/${waiting.id}`}>Read and sign now</LinkButton>
+              <button className="py-2 text-sm font-medium text-stone-500 hover:text-stone-800" onClick={() => { sessionStorage.setItem('kmal_agreement_reminder', 'closed'); setReminderClosed(true) }}>Remind me later</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-5xl space-y-6 px-5 py-8">
         {params.get('welcome') && (

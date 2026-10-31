@@ -40,7 +40,9 @@ def preview(template: str) -> dict:
 
 
 def send(template: str, to: str, **context) -> EmailLog | None:
-    if not to:
+    from live.signals import _silent
+
+    if not to or _silent.get():  # demo data loading must not email anyone
         return None
     try:
         subject, html, text = render(template, context)

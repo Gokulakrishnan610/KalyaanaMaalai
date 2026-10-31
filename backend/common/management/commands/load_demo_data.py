@@ -12,15 +12,16 @@ DEMO_FILES = [
     "demo_data.weddings_and_tasks",
     "demo_data.vendors_and_quotations",
     "demo_data.payments",
+    "demo_data.portal_and_agreements",
 ]
 
 
 class Command(BaseCommand):
-    help = "Fill the database with the Aarav & Meera demo wedding. Safe to run more than once."
+    help = "Fill the database with the demo data: staff, vendors, couples (with website logins), agreements and payments. Safe to run more than once."
 
-    @transaction.atomic
     def handle(self, *args, **options):
-        with silenced():  # demo data should not flood the live feed or the bell
+        # silenced is outside the transaction, so the "after commit" emails are skipped too
+        with silenced(), transaction.atomic():  # demo data should not flood the live feed, the bell or anyone's inbox
             self.load_all()
 
     def load_all(self):
