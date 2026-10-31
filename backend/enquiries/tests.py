@@ -215,3 +215,30 @@ class ClientIdentityTests(APITestCase):
         res = self.client.patch(f"/api/enquiries/{enquiry}/", {"status": "CONTACTED"}, format="json")
         self.assertEqual((res.status_code, res.data["status"], res.data["win_chance"]), (200, "CONTACTED", 20))
         self.assertEqual(self.client.patch(f"/api/enquiries/{enquiry}/", {"status": "LOST"}, format="json").status_code, 400)
+
+
+class EnquiryListTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.planner = User.objects.create_user("p2@t.com", "Planner", "Password123", role=Role.PLANNER)
+        for i in range(25):
+            Enquiry.objects.create(couple_name=f"Couple {i}", phone="9812345670", source="CALL",
+                                   status=Status.NEW if i < 15 else Status.WON)
+        Enquiry.objects.create(couple_name="Meera & Dev", phone="9812345671", source="WEBSITE", status=Status.CONTACTED)
+
+    def setUp(self):
+        self.client.force_authenticate(self.planner)
+
+    def test_list_comes_in_pages_of_twenty(self):
+        first = self.client.get("/api/enquiries/").data
+        second = self.client.get("/api/enquiries/?page=2").data
+        self.assertEqual(first["count"], 26)
+        self.assertEqual((len(first["results"]), len(second["results"])), (20, 6))
+
+    def test_counts_per_stage(self):
+        counts = self.client.get("/api/enquiries/counts/").data
+        self.assertEqual(counts, {"ALL": 26, "NEW": 15, "WON": 10, "CONTACTED": 1})
+
+    def test_counts_follow_search_and_source_but_not_status(self):
+        self.assertEqual(self.client.get("/api/enquiries/counts/?q=Meera").data, {"ALL": 1, "CONTACTED": 1})
+        self.assertEqual(self.client.get("/api/enquiries/counts/?source=WEBSITE&status=NEW").data, {"ALL": 1, "CONTACTED": 1})

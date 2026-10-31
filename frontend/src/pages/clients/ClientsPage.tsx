@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EmptyState, ErrorState, SearchBox, Spinner, Table, Td, Th } from '@/components/common'
+import { EmptyState, ErrorState, Pager, SearchBox, Spinner, Table, Td, Th } from '@/components/common'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { get, type Page } from '@/api/client'
 import { formatDate } from '@/helpers/date'
@@ -17,12 +17,15 @@ export interface Client {
   created_at: string
 }
 
+const PAGE_SIZE = 20
+
 export default function ClientsPage() {
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const debounced = useDebouncedValue(search.trim())
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['clients', debounced],
-    queryFn: ({ signal }) => get<Page<Client>>('/clients/', { q: debounced || undefined, page_size: 100 }, signal),
+    queryKey: ['clients', debounced, page],
+    queryFn: ({ signal }) => get<Page<Client>>('/clients/', { q: debounced || undefined, page, page_size: PAGE_SIZE }, signal),
     placeholderData: keepPreviousData,
   })
 
@@ -35,7 +38,10 @@ export default function ClientsPage() {
         label="Search clients"
         placeholder="Search name, email, phone or city"
         value={search}
-        onChange={setSearch}
+        onChange={(value) => {
+          setSearch(value)
+          setPage(1)
+        }}
         busy={search.trim() !== debounced || isFetching}
         className="mb-4"
       />
@@ -71,6 +77,7 @@ export default function ClientsPage() {
           </tbody>
         </Table>
       )}
+      {data && <Pager page={page} pageSize={PAGE_SIZE} total={data.count} onPage={setPage} noun="clients" />}
     </div>
   )
 }

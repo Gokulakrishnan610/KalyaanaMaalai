@@ -1,4 +1,4 @@
-from django.db.models import Min, Q
+from django.db.models import Count, Min, Q
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -17,11 +17,12 @@ class EnquiryViewSet(viewsets.ModelViewSet):
 
     serializer_class = EnquirySerializer
 
-    def get_queryset(self):
+    def filtered(self, with_status=True):
+        """The enquiries matching ?source= and ?q= (and ?status= unless `with_status` is off, for the tab counts)."""
         enquiries = Enquiry.objects.select_related("client", "owner").annotate(
             next_follow_up_at=Min("follow_ups__due_at", filter=Q(follow_ups__done_at__isnull=True)))
         params = self.request.query_params
-        if params.get("status"):
+        if with_status and params.get("status"):
             enquiries = enquiries.filter(status=params["status"])
         if params.get("source"):
             enquiries = enquiries.filter(source=params["source"])
@@ -30,7 +31,17 @@ class EnquiryViewSet(viewsets.ModelViewSet):
             enquiries = enquiries.filter(
                 Q(couple_name__icontains=text) | Q(client_name__icontains=text) | Q(partner_name__icontains=text)
                 | Q(email__icontains=text) | Q(spouse_email__icontains=text) | Q(phone__icontains=text))
-        return enquiries.order_by("-created_at")
+        return enquiries
+
+    def get_queryset(self):
+        return self.filtered().order_by("-created_at")
+
+    @action(detail=False, methods=["get"])
+    def counts(self, request):
+        """How many enquiries are in each stage, for the tabs. Respects ?source= and ?q= but not ?status=."""
+        rows = self.filtered(with_status=False).order_by().values("status").annotate(n=Count("id", distinct=True))
+        counts = {row["status"]: row["n"] for row in rows}
+        return Response({"ALL": sum(counts.values()), **counts})
 
     def get_permissions(self):
         if self.action == "destroy":

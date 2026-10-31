@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { MoreVertical, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, cn, EmptyState, ErrorState, SearchBox, Select, Spinner, StatusSelect, Table, Td, Th } from '@/components/common'
+import { Button, cn, EmptyState, ErrorState, Pager, SearchBox, Select, Spinner, StatusSelect, Table, Td, Th } from '@/components/common'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { get, patch, type Page } from '@/api/client'
 import { formatDate, formatDateTime } from '@/helpers/date'
@@ -12,6 +12,8 @@ import { EnquiryBoard } from './EnquiryBoard'
 import { EnquiryForm } from './EnquiryForm'
 import { StarRating } from './StarRating'
 import { SOURCES, sourceInfo, STATUSES, type Enquiry, type Status } from './types'
+
+const PAGE_SIZE = 20 // the table shows 20 at a time; the board needs every card, so it loads up to 200
 
 type View = 'table' | 'board'
 type Tab = Status | 'ALL'
@@ -38,14 +40,32 @@ export default function EnquiriesPage() {
   const [source, setSource] = useState('')
   const [search, setSearch] = useState(params.get('q') ?? '') // the top-bar search arrives as ?q=
   const deferredSearch = useDebouncedValue(search.trim())
+  const [page, setPage] = useState(1)
+  const goBackToFirstPage = <T,>(setter: (value: T) => void) => (value: T) => {
+    setter(value)
+    setPage(1)
+  }
   // null = nothing open, 'new' = the add form, or the enquiry being viewed/edited
   const [open, setOpen] = useState<Enquiry | 'new' | null>(null)
 
-  const queryKey = ['enquiries', source, deferredSearch]
+  const onTable = view === 'table'
+  const queryKey = ['enquiries', { onTable, tab, source, q: deferredSearch, page }]
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey,
     queryFn: ({ signal }) =>
-      get<Page<Enquiry>>('/enquiries/', { page_size: 200, source: source || undefined, q: deferredSearch || undefined }, signal),
+      get<Page<Enquiry>>(
+        '/enquiries/',
+        onTable
+          ? { page, page_size: PAGE_SIZE, status: tab === 'ALL' ? undefined : tab, source: source || undefined, q: deferredSearch || undefined }
+          : { page_size: 200, source: source || undefined, q: deferredSearch || undefined },
+        signal,
+      ),
+    placeholderData: keepPreviousData,
+  })
+  // the numbers on the tabs come from the server, because the table only holds one page
+  const counts = useQuery({
+    queryKey: ['enquiries', 'counts', source, deferredSearch],
+    queryFn: ({ signal }) => get<Record<string, number>>('/enquiries/counts/', { source: source || undefined, q: deferredSearch || undefined }, signal),
     placeholderData: keepPreviousData,
   })
 
@@ -68,9 +88,8 @@ export default function EnquiriesPage() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['enquiries'] }),
   })
 
-  const all = data?.results ?? []
-  const shown = view === 'table' && tab !== 'ALL' ? all.filter((e) => e.status === tab) : all
-  const countFor = (status: Tab) => (status === 'ALL' ? all.length : all.filter((e) => e.status === status).length)
+  const shown = data?.results ?? []
+  const countFor = (status: Tab) => counts.data?.[status] ?? 0
 
   return (
     <div>
@@ -91,7 +110,10 @@ export default function EnquiriesPage() {
           {([{ value: 'ALL', label: 'All' }, ...STATUSES] as { value: Tab; label: string }[]).map((t) => (
             <button
               key={t.value}
-              onClick={() => setTab(t.value)}
+              onClick={() => {
+                setTab(t.value)
+                setPage(1)
+              }}
               className={cn(
                 '-mb-px border-b-2 px-4 py-2 text-sm font-medium',
                 tab === t.value ? 'border-brand-500 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800',
@@ -108,12 +130,12 @@ export default function EnquiriesPage() {
           label="Search enquiries"
           placeholder="Search name, email or phone"
           value={search}
-          onChange={setSearch}
+          onChange={goBackToFirstPage(setSearch)}
           busy={search.trim() !== deferredSearch || isFetching}
           className="w-64"
         />
         <div className="w-44">
-          <Select aria-label="Filter by source" value={source} onChange={(e) => setSource(e.target.value)}>
+          <Select aria-label="Filter by source" value={source} onChange={(e) => goBackToFirstPage(setSource)(e.target.value)}>
             <option value="">All sources</option>
             {SOURCES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -222,6 +244,7 @@ export default function EnquiriesPage() {
           </tbody>
         </Table>
       )}
+      {data && onTable && <Pager page={page} pageSize={PAGE_SIZE} total={data.count} onPage={setPage} noun="enquiries" />}
 
       {open && <EnquiryForm key={open === 'new' ? 'new' : open.id} enquiry={open === 'new' ? null : open} onClose={() => setOpen(null)} />}
     </div>
