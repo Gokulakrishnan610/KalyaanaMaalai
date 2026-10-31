@@ -89,5 +89,7 @@ export interface QuotationDraft {
   price_per_plate_paise?: number
   menu_notes?: string
   valid_till?: string
+  confidence?: number
+  warnings?: string[]
   items?: { description?: string; qty?: number; quantity?: number; unit_price_paise?: number }[]
 }

@@ -83,7 +83,7 @@ class PaiseConversionTests(AITestCase):
         self.assertTrue(any("validity date" in w for w in draft["warnings"]))
 
 
-@override_settings(MOCK_EXTERNALS=True)
+@override_settings(AI_LIVE=False)
 class ExtractQuotationMockTests(AITestCase):
     def test_sample_pdf_returns_a_validated_draft_in_paise(self):
         res = self.upload()
@@ -117,7 +117,7 @@ class ExtractQuotationMockTests(AITestCase):
         self.assertEqual(self.upload().status_code, 403)
 
 
-@override_settings(MOCK_EXTERNALS=False, OPENAI_API_KEY="test-key")
+@override_settings(AI_LIVE=True, GROQ_API_KEY="test-key", GROQ_MODEL="", GROQ_VISION_MODEL="")
 class ExtractQuotationRealPathTests(AITestCase):
     """The OpenAI call is replaced, so these check our own retry, validation and conversion code."""
 
@@ -141,38 +141,129 @@ class ExtractQuotationRealPathTests(AITestCase):
         self.assertIn("type the quotation in", res.data["detail"])
         self.assertEqual(AIJob.objects.get().status, "FAILED")
 
-    def test_an_image_goes_to_the_vision_model(self):
+    def capture(self):
         captured = {}
 
-        def fake(messages, response_format):
-            captured["content"] = messages[1]["content"]
+        def fake(system, content, output_format, vision=False):
+            captured.update(system=system, content=content, vision=vision)
             return self.good()
 
-        with mock.patch.object(services, "_parse", side_effect=fake):
-            services.extract_quotation(b"\x89PNG\r\n\x1a\n" + b"0" * 50, "photo.png")
-        self.assertEqual([part["type"] for part in captured["content"]], ["text", "image_url"])
-        self.assertTrue(captured["content"][1]["image_url"]["url"].startswith("data:image/png;base64,"))
+        return captured, mock.patch.object(services, "_parse", side_effect=fake)
 
-    def test_a_pdf_with_text_is_sent_as_text(self):
-        captured = {}
-
-        def fake(messages, response_format):
-            captured["content"] = messages[1]["content"]
-            return self.good()
-
-        with mock.patch.object(services, "_parse", side_effect=fake):
+    def test_a_pdf_with_text_goes_to_the_text_model_as_plain_text(self):
+        captured, patched = self.capture()
+        with patched:
             services.extract_quotation(sample_bytes(), "sample.pdf")
+        self.assertFalse(captured["vision"])
         self.assertEqual([part["type"] for part in captured["content"]], ["text"])
         self.assertIn("Maharaja Feast", captured["content"][0]["text"])
 
-    def test_an_api_outage_is_a_503_not_a_crash(self):
-        with mock.patch.object(services, "_parse", side_effect=ConnectionError("down")):
+    def test_an_image_goes_to_the_vision_model_as_a_data_url(self):
+        captured, patched = self.capture()
+        with patched:
+            services.extract_quotation(b"\x89PNG\r\n\x1a\n" + b"0" * 50, "photo.png")
+        self.assertTrue(captured["vision"])
+        self.assertEqual([part["type"] for part in captured["content"]], ["text", "image_url"])
+        self.assertTrue(captured["content"][1]["image_url"]["url"].startswith("data:image/png;base64,"))
+
+    def test_a_scanned_pdf_is_shown_to_the_vision_model_page_by_page(self):
+        captured, patched = self.capture()
+        with patched, mock.patch.object(services, "_pdf_text_and_pages", return_value=("", [b"page1", b"page2"])):
+            services.extract_quotation(sample_bytes(), "scan.pdf")
+        self.assertTrue(captured["vision"])
+        self.assertEqual([part["type"] for part in captured["content"]], ["text", "image_url", "image_url"])
+
+    def test_the_forms_row_names_and_category_are_given_to_the_ai(self):
+        captured, patched = self.capture()
+        with patched:
+            services.extract_quotation(sample_bytes(), "sample.pdf", category="Caterer",
+                                       preferred_names=["Buffet menu", "Welcome drinks"])
+        self.assertIn("Caterer", captured["system"])
+        self.assertIn("Buffet menu; Welcome drinks", captured["system"])
+        self.assertIn("EXACTLY", captured["system"])
+
+    def test_the_view_passes_category_and_row_labels_through(self):
+        with mock.patch.object(services, "_parse", return_value=self.good()) as parse:
+            res = self.client.post("/api/quotations/extract/", {
+                "file": SimpleUploadedFile("q.pdf", sample_bytes(), "application/pdf"), "category": "Caterer",
+                "row_labels": ["Buffet menu", "Dessert station"]}, format="multipart")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["draft"]["total_paise"], 500 * R)
+        self.assertIn("Buffet menu; Dessert station", parse.call_args.args[0])
+
+    def test_the_view_shows_the_ais_own_reason_when_it_cannot_read_the_file(self):
+        bad = self.good()
+        bad.total_rupees = 0
+        with mock.patch.object(services, "_parse", return_value=bad):
+            res = self.client.post("/api/quotations/extract/", {
+                "file": SimpleUploadedFile("q.pdf", sample_bytes(), "application/pdf")}, format="multipart")
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("type the quotation in", res.data["detail"])
+
+@override_settings(AI_LIVE=True, GROQ_API_KEY="test-key", GROQ_MODEL="", GROQ_VISION_MODEL="")
+class GroqRequestTests(AITestCase):
+    """Fakes the Groq client itself, to check exactly what we send and how we read the answer."""
+
+    ANSWER = ('{"vendor_name": "V", "total_rupees": 500, "confidence": 0.8, "items": '
+              '[{"description": "Menu", "qty": 5, "unit_price_rupees": 100}]}')
+
+    def fake_client(self, content=None, finish_reason="stop"):
+        message = mock.Mock(content=self.ANSWER if content is None else content)
+        client = mock.Mock()
+        client.chat.completions.create.return_value = mock.Mock(
+            choices=[mock.Mock(message=message, finish_reason=finish_reason)])
+        return client
+
+    def test_a_text_pdf_uses_the_text_model_in_json_mode_with_the_schema(self):
+        client = self.fake_client()
+        with mock.patch.object(services, "_client", return_value=client):
+            draft = services.extract_quotation(sample_bytes(), "sample.pdf", category="Caterer")
+        kwargs = client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "openai/gpt-oss-120b")
+        self.assertEqual((kwargs["response_format"], kwargs["temperature"]), ({"type": "json_object"}, 0))
+        system, user = kwargs["messages"]
+        self.assertIn("vendor_name", system["content"])  # the schema is described to the model
+        self.assertIn("JSON", system["content"])
+        self.assertIsInstance(user["content"], str)  # a text-only message is a plain string
+        self.assertEqual(draft["total_paise"], 500 * R)
+
+    def test_a_photo_uses_the_vision_model(self):
+        client = self.fake_client()
+        with mock.patch.object(services, "_client", return_value=client):
+            services.extract_quotation(b"\x89PNG\r\n\x1a\n" + b"0" * 50, "photo.png")
+        kwargs = client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "qwen/qwen3.8-27b")
+        self.assertEqual([p["type"] for p in kwargs["messages"][1]["content"]], ["text", "image_url"])
+
+    @override_settings(GROQ_MODEL="llama-3.3-70b-versatile", GROQ_VISION_MODEL="some/vision-model")
+    def test_both_models_can_be_changed_in_settings(self):
+        client = self.fake_client()
+        with mock.patch.object(services, "_client", return_value=client):
+            services.extract_quotation(sample_bytes(), "sample.pdf")
+            services.extract_quotation(b"\x89PNG\r\n\x1a\n" + b"0" * 50, "photo.png")
+        models = [call.kwargs["model"] for call in client.chat.completions.create.call_args_list]
+        self.assertEqual(models, ["llama-3.3-70b-versatile", "some/vision-model"])
+
+    def test_text_that_is_not_the_right_json_is_retried_then_reported(self):
+        client = self.fake_client(content='{"vendor_name": "V"}')  # no total
+        with mock.patch.object(services, "_client", return_value=client):
             with self.assertRaises(APIException) as caught:
                 services.extract_quotation(sample_bytes(), "sample.pdf")
-        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual((caught.exception.status_code, client.chat.completions.create.call_count), (422, 2))
+
+    def test_a_cut_off_answer_is_retried_then_reported(self):
+        client = self.fake_client(finish_reason="length")
+        with mock.patch.object(services, "_client", return_value=client):
+            with self.assertRaises(APIException) as caught:
+                services.extract_quotation(sample_bytes(), "sample.pdf")
+        self.assertEqual((caught.exception.status_code, client.chat.completions.create.call_count), (422, 2))
+
+    @override_settings(GROQ_API_KEY="")
+    def test_without_a_key_the_sample_is_returned_not_an_error(self):
+        self.assertEqual(services.extract_quotation(sample_bytes(), "sample.pdf")["vendor_name"], "Maharaja Feast")
 
 
-@override_settings(MOCK_EXTERNALS=True)
+@override_settings(AI_LIVE=False)
 class ChecklistTests(AITestCase):
     def preview(self):
         return self.client.post("/api/ai/generate-checklist/", {"wedding_id": self.wedding.pk}, format="json")
@@ -231,7 +322,7 @@ class ChecklistTests(AITestCase):
         self.assertEqual(res.status_code, 404)
 
 
-@override_settings(MOCK_EXTERNALS=False, OPENAI_API_KEY="test-key")
+@override_settings(AI_LIVE=True, GROQ_API_KEY="test-key", GROQ_MODEL="", GROQ_VISION_MODEL="")
 class ChecklistFallbackTests(AITestCase):
     def preview(self):
         return self.client.post("/api/ai/generate-checklist/", {"wedding_id": self.wedding.pk}, format="json")
