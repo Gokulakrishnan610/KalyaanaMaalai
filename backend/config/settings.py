@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     "incidents",
     "live",
     "portal",
+    "mailer",
+    "agreements",
 ]
 
 MIDDLEWARE = [
@@ -140,6 +142,7 @@ RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET")
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = env("TELEGRAM_CHAT_ID")
+DEFAULT_FROM_EMAIL = env("MAIL_FROM", "Shaandaar Events <no-reply@shaandaar.example>")
 EMAIL_HOST = env("SMTP_HOST")
 EMAIL_PORT = int(env("SMTP_PORT", "587"))
 EMAIL_HOST_USER = env("SMTP_USER")

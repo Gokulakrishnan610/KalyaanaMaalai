@@ -1,0 +1,2 @@
+{% extends "mailer/base.html" %}
+{% block body %}<p>Hello {{ name }},</p><p>The service agreement for <b>{{ wedding }}</b> is ready. Please read it and sign it online. It takes two minutes.</p><p style="margin:24px 0;"><a href="{{ link }}" style="background:#7a1f3d;color:#fff;padding:12px 22px;border-radius:24px;text-decoration:none;font-weight:bold;">Read and sign</a></p><p>We will send a code to this email address to confirm that it is really you.</p>{% endblock %}

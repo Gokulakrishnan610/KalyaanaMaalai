@@ -1,0 +1,2 @@
+{% extends "mailer/base.html" %}
+{% block body %}<p>Hello {{ name }},</p><p>This is a gentle reminder that <b>{{ title }}</b> (Rs {{ amount }}) for {{ wedding }} was due on {{ due_date }}.</p><p style="margin:24px 0;"><a href="{{ link }}" style="background:#7a1f3d;color:#fff;padding:12px 22px;border-radius:24px;text-decoration:none;font-weight:bold;">Pay now</a></p><p>If you have already paid, please ignore this message.</p>{% endblock %}

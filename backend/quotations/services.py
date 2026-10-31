@@ -316,26 +316,21 @@ def notify_vendors(request: QuotationRequest):
     """Emails each invited vendor (real mode) or leaves a bell notification (mock mode). Returns how many."""
     vendors = list(request.invited_vendors.all())
     wedding = request.wedding
-    subject = f"Quotation request: {request.category.name} for {wedding.title}"
-    due = f" Please reply by {request.reply_by:%d %b %Y}." if request.reply_by else ""
-    body = (f"Hello,\n\nShaandaar Events would like a quotation for {request.category.name} "
-            f"({request.guest_count or wedding.guest_count} guests) for {wedding.title} in {wedding.city}.\n\n"
-            f"Requirements:\n{request.requirements or 'To be discussed.'}\n{due}\n\nThank you.")
+    from django.conf import settings as django_settings
+
+    def send():
+        from mailer import services as mail
+
+        for vendor in vendors:
+            mail.send("vendor_quotation_request", vendor.email, vendor=vendor.name, category=request.category.name,
+                      wedding=wedding.title, date=f"{wedding.start_date:%d %b %Y}",
+                      reply_by=f"{request.reply_by:%d %b %Y}" if request.reply_by else "",
+                      link=f"{django_settings.FRONTEND_URL}/vendor/requests")
+
+    transaction.on_commit(send)
     live = not settings.MOCK_EXTERNALS and bool(settings.EMAIL_HOST)
     if live:
-        emails = [(subject, body, settings.EMAIL_HOST_USER or None, [v.email]) for v in vendors if v.email]
-
-        def send():
-            from django.core.mail import send_mass_mail
-            try:
-                send_mass_mail(emails, fail_silently=False)
-            except Exception:  # noqa: BLE001
-                logger.exception("Could not email quotation request %s", request.pk)
-
-        # sent after the database change is saved, in a background thread so the click returns at once
-        import threading
-        transaction.on_commit(lambda: threading.Thread(target=send, daemon=True).start())
-        return len(emails)
+        return len([v for v in vendors if v.email])
     _notify(f"Quotation request sent to {len(vendors)} {request.category.name.lower()}(s) for {wedding.title}.")
     return len(vendors)
 
