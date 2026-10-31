@@ -264,11 +264,9 @@ def generate_checklist(wedding) -> dict:
 @transaction.atomic
 def confirm_checklist(wedding, tasks: list[dict]) -> dict:
     """Saves the tasks the planner kept. Titles that already exist on the wedding are skipped."""
-    from tasks.models import Task
-    try:  # Member 2's helper, when it exists
-        from tasks.services import create_tasks_from_template
-    except ImportError:
-        create_tasks_from_template = None
+    from django.db.models import Max
+
+    from tasks.models import Stage, Task
 
     existing = {_normal(t) for t in wedding.tasks.values_list("title", flat=True)}
     functions = {f.name.lower(): f for f in wedding.functions.all()}
@@ -279,11 +277,10 @@ def confirm_checklist(wedding, tasks: list[dict]) -> dict:
             continue
         existing.add(key)
         fresh.append(task)
-    if create_tasks_from_template and fresh:
-        created = create_tasks_from_template(wedding, fresh)
-        return {"created": len(created) if created is not None else len(fresh), "skipped": len(tasks) - len(fresh)}
-
-    position = wedding.tasks.count()
+    # AI tasks have their own titles, dates and functions, so they are saved here instead of through
+    # tasks.services.create_tasks_from_template (which only knows the standard template)
+    last = Task.objects.filter(wedding=wedding, stage=Stage.TO_PLAN).aggregate(last=Max("position"))["last"]
+    position = 0 if last is None else last + 1
     rows = []
     for index, task in enumerate(fresh):
         due = task.get("due_date")

@@ -2,11 +2,12 @@ import { Card } from '@/components/common'
 import { formatINR } from '@/helpers/money'
 import type { Financials } from './types'
 
+// one line per figure (label left, amount right), so long amounts never run into each other in a narrow card
 function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div>
+    <div className="flex items-baseline justify-between gap-3">
       <div className="text-xs text-slate-500">{label}</div>
-      <div className={`text-lg font-semibold tabular-nums ${tone ?? ''}`}>{value}</div>
+      <div className={`text-base font-semibold tabular-nums ${tone ?? ''}`}>{value}</div>
     </div>
   )
 }
@@ -18,7 +19,7 @@ export function SummaryCards({ data }: { data: Financials }) {
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <Card>
         <div className="mb-3 text-sm font-semibold text-slate-700">Revenue</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1.5">
           <Stat label="Invoiced" value={formatINR(revenue.invoiced)} />
           <Stat label="Received" value={formatINR(revenue.received)} tone="text-emerald-600" />
           <Stat label="Outstanding" value={formatINR(revenue.outstanding)} tone={revenue.outstanding ? 'text-amber-600' : ''} />
@@ -26,7 +27,7 @@ export function SummaryCards({ data }: { data: Financials }) {
       </Card>
       <Card>
         <div className="mb-3 text-sm font-semibold text-slate-700">Expenses</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1.5">
           <Stat label="Planned" value={formatINR(expenses.planned)} />
           <Stat label="Paid" value={formatINR(expenses.paid)} />
           <Stat label="Outstanding" value={formatINR(expenses.outstanding)} tone={expenses.outstanding ? 'text-amber-600' : ''} />
@@ -34,7 +35,7 @@ export function SummaryCards({ data }: { data: Financials }) {
       </Card>
       <Card>
         <div className="mb-3 text-sm font-semibold text-slate-700">Profit</div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1.5">
           <Stat label="Estimated" value={formatINR(data.estimated_profit)} tone={profitTone(data.estimated_profit)} />
           <Stat label="Actual so far" value={formatINR(data.actual_profit)} tone={profitTone(data.actual_profit)} />
         </div>

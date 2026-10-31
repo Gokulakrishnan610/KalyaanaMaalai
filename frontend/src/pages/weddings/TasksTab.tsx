@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { ApiError, get, patch, post, remove } from '@/api/client'
 import { Badge, Button, cn, ErrorState, Input, Modal, Select, Spinner } from '@/components/common'
 import { formatDate } from '@/helpers/date'
+import { AIChecklistButton } from '@/pages/ai/AIChecklistPreview'
 import { useLogin } from '@/login/LoginContext'
 import { initials, STAGES, useStaffUsers, type Priority, type Stage, type Task, type WeddingDetail } from './types'
 
@@ -357,8 +358,7 @@ export function TasksTab({ wedding }: { wedding: WeddingDetail }) {
           Overdue only
         </label>
         <div className="ml-auto flex gap-2">
-          {/* Member 4 plugs "Generate with AI" in here */}
-          <span id="ai-generate-slot" />
+          {canEdit && <AIChecklistButton weddingId={wedding.id} onAdded={refreshAll} />}
           {canEdit && (
             <Button variant="secondary" onClick={() => setTemplateOpen(true)}>
               Generate from template

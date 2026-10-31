@@ -12,8 +12,9 @@ from weddings.models import Wedding
 R = 100  # paise per rupee
 
 # (vendor, category, bill amount in rupees, bill ref, final due in days from today)
+# No caterer here on purpose: the caterer is still being chosen (see vendors_and_quotations.py), and
+# selecting the winner creates that bill. Adding one here would count it twice.
 VENDOR_BILLS = [
-    ("Rasoi Royale", "Caterer", 517_500, "RR-2026-014", 117),
     ("Petals & Pillars Decor", "Decorator", 650_000, "PP-0312", 117),
     ("DJ Rhythm Raj", "DJ & Sound", 180_000, "DJR-88", -6),  # final instalment is overdue
     ("Lens & Lehenga Studio", "Photographer", 240_000, "LL-1107", 117),
