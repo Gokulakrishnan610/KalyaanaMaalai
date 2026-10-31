@@ -1,8 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Fragment, useState, type FormEvent } from 'react'
-import { get, post, remove } from '@/api/client'
-import { Button, EmptyState, ErrorState, Input, Modal, Select, Spinner, Table, Td, Th } from '@/components/common'
+import { get, post, remove, type Page } from '@/api/client'
+import { Button, EmptyState, ErrorState, Input, Modal, Pager, Select, Spinner, Table, Td, Th } from '@/components/common'
 import { formatDate } from '@/helpers/date'
 import { formatINR, rupeesToPaise } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
@@ -10,6 +10,8 @@ import { useRefreshMoney } from './finance'
 import { RecordPaymentModal } from './RecordPaymentModal'
 import { StatusBadge } from './shared'
 import type { Instalment, OverviewRow, VendorBill } from './types'
+
+const PAGE_SIZE = 20 // the server sends one page at a time, so the list stays quick with thousands of rows
 
 const FILTERS = [
   { value: 'open', label: 'Still to pay' },
@@ -28,10 +30,14 @@ export function VendorPayments({ weddingId, weddings, adding, onCloseAdd }: { we
   const [open, setOpen] = useState<Set<number>>(new Set())
   const [target, setTarget] = useState<Target | null>(null)
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['finance', 'bills', weddingId ?? 'all', filter],
-    queryFn: () => get<VendorBill[]>('/finance/vendor-bills/', { wedding: weddingId ?? undefined, status: filter === 'all' ? undefined : filter }),
+  const [page, setPage] = useState(1)
+  const page_ = useQuery({
+    queryKey: ['finance', 'bills', weddingId ?? 'all', filter, page],
+    queryFn: () => get<Page<VendorBill>>('/finance/vendor-bills/', { wedding: weddingId ?? undefined, status: filter === 'all' ? undefined : filter, page, page_size: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   })
+  const { isLoading, error, refetch } = page_
+  const data = page_.data?.results
   const del = useMutation({ mutationFn: (id: number) => remove(`/expenses/${id}/`), onSuccess: () => refresh() })
 
   const shown = (data ?? []).filter((b) =>
@@ -51,7 +57,7 @@ export function VendorPayments({ weddingId, weddings, adding, onCloseAdd }: { we
           What we owe vendors. Open a bill to see its advance and final instalments. When you pay a vendor, <b>record the payment</b> here so the balance stays right.
         </p>
         <div className="w-44">
-          <Select aria-label="Show bills" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <Select aria-label="Show bills" value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1) }}>
             {FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
@@ -169,6 +175,7 @@ export function VendorPayments({ weddingId, weddings, adding, onCloseAdd }: { we
           onClose={() => setTarget(null)}
         />
       )}
+      {page_.data && <Pager page={page} pageSize={PAGE_SIZE} total={page_.data.count} onPage={setPage} noun="bills" />}
       {adding && <AddBillModal weddingId={weddingId} weddings={weddings} onClose={onCloseAdd} />}
     </section>
   )

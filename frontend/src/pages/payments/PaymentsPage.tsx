@@ -8,7 +8,7 @@ import type { Overview } from './types'
 /** The Payments page: choose all weddings or one, then collect from customers, pay vendors, or look back. */
 export default function PaymentsPage() {
   const [wedding, setWedding] = useState('')
-  const { data } = useQuery({ queryKey: ['finance-overview'], queryFn: () => get<Overview>('/finance/overview/') })
+  const { data } = useQuery({ queryKey: ['finance-overview', 'all'], queryFn: () => get<Overview>('/finance/overview/') })
   const weddingId = wedding ? Number(wedding) : null
 
   return (

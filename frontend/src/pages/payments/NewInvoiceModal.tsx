@@ -10,15 +10,20 @@ interface Props {
   /** the wedding when the page is already about one wedding, otherwise the planner picks */
   weddingId: number | null
   weddings: OverviewRow[]
-  existing: InvoiceRow[]
   onClose: () => void
 }
 
 /** Asks a customer for money: a deposit, an instalment, the final payment, or the charge for extra guests. */
-export function NewInvoiceModal({ weddingId, weddings, existing, onClose }: Props) {
+export function NewInvoiceModal({ weddingId, weddings, onClose }: Props) {
   const refresh = useRefreshMoney()
   const [wedding, setWedding] = useState(weddingId ? String(weddingId) : '')
-  const hasDeposit = existing.some((i) => i.wedding_id === Number(wedding) && i.type === 'DEPOSIT')
+  // only the chosen wedding's invoices are needed, to know whether it already has a booking deposit
+  const existing = useQuery({
+    queryKey: ['finance', 'invoices', wedding, 'for-new'],
+    queryFn: () => get<InvoiceRow[]>('/invoices/', { wedding }),
+    enabled: Boolean(wedding),
+  })
+  const hasDeposit = (existing.data ?? []).some((i) => i.type === 'DEPOSIT')
   const [type, setType] = useState<InvoiceType>('DEPOSIT')
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState('')

@@ -7,7 +7,7 @@ import { useLogin } from '@/login/LoginContext'
 import { CustomerPayments } from './CustomerPayments'
 import { PaymentHistory } from './PaymentHistory'
 import { StatCards } from './StatCards'
-import type { InvoiceRow, Overview, VendorBill } from './types'
+import type { Overview } from './types'
 import { VendorPayments } from './VendorPayments'
 
 type Tab = 'customers' | 'vendors' | 'history'
@@ -24,18 +24,10 @@ export function PaymentsWorkspace({ weddingId }: { weddingId: number | null }) {
   const [adding, setAdding] = useState(false)
   const scope = weddingId ?? 'all'
 
-  const overview = useQuery({ queryKey: ['finance-overview'], queryFn: () => get<Overview>('/finance/overview/') })
-  // the same queries the sections use, so the tab badges cost nothing extra
-  const invoices = useQuery({
-    queryKey: ['finance', 'invoices', scope, 'open'],
-    queryFn: () => get<InvoiceRow[]>('/invoices/', { wedding: weddingId ?? undefined, status: 'open' }),
-  })
-  const bills = useQuery({
-    queryKey: ['finance', 'bills', scope, 'open'],
-    queryFn: () => get<VendorBill[]>('/finance/vendor-bills/', { wedding: weddingId ?? undefined, status: 'open' }),
-  })
-  const lateFromCustomers = invoices.data?.filter((i) => i.overdue).length ?? 0
-  const lateToVendors = bills.data?.filter((b) => b.overdue).length ?? 0
+  // the same answer the number cards use: totals, late counts for the tab badges, and the wedding picker
+  const overview = useQuery({ queryKey: ['finance-overview', scope], queryFn: () => get<Overview>('/finance/overview/', { wedding: weddingId ?? undefined }) })
+  const lateFromCustomers = overview.data?.counts.overdue_invoices ?? 0
+  const lateToVendors = overview.data?.counts.overdue_bills ?? 0
 
   const tabs: { id: Tab; label: string; late: number }[] = [
     { id: 'customers', label: 'From customers', late: lateFromCustomers },

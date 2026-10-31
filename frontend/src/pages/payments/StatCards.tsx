@@ -6,15 +6,12 @@ import type { Overview } from './types'
 
 /** Four numbers: what to collect, what is collected, what to pay vendors, and the profit that leaves. */
 export function StatCards({ weddingId }: { weddingId: number | null }) {
-  const { data } = useQuery({ queryKey: ['finance-overview'], queryFn: () => get<Overview>('/finance/overview/') })
-  const rows = (data?.weddings ?? []).filter((w) => weddingId === null || w.wedding_id === weddingId)
-  const sum = (field: 'invoiced_paise' | 'received_paise' | 'planned_expense_paise' | 'paid_expense_paise') =>
-    rows.reduce((total, w) => total + w[field], 0)
-
-  const invoiced = sum('invoiced_paise')
-  const received = sum('received_paise')
-  const bills = sum('planned_expense_paise')
-  const paid = sum('paid_expense_paise')
+  // the server adds everything up, for all weddings or the one chosen
+  const { data } = useQuery({ queryKey: ['finance-overview', weddingId ?? 'all'], queryFn: () => get<Overview>('/finance/overview/', { wedding: weddingId ?? undefined }) })
+  const invoiced = data?.totals.invoiced_paise ?? 0
+  const received = data?.totals.received_paise ?? 0
+  const bills = data?.totals.planned_expense_paise ?? 0
+  const paid = data?.totals.paid_expense_paise ?? 0
   const cards = [
     { label: 'Still to collect', value: invoiced - received, hint: `of ${formatINR(invoiced)} invoiced`, tone: invoiced - received > 0 ? 'text-amber-600' : '' },
     { label: 'Collected', value: received, hint: 'received from customers', tone: 'text-emerald-600' },

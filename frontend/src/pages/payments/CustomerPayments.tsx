@@ -1,8 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { Link2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { get, remove } from '@/api/client'
-import { Badge, Button, EmptyState, ErrorState, Select, Spinner, Table, Td, Th } from '@/components/common'
+import { get, remove, type Page } from '@/api/client'
+import { Badge, Button, EmptyState, ErrorState, Pager, Select, Spinner, Table, Td, Th } from '@/components/common'
 import { formatDate } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
@@ -12,6 +12,8 @@ import { PaymentLinkModal } from './PaymentLinkModal'
 import { RecordPaymentModal } from './RecordPaymentModal'
 import { StatusBadge } from './shared'
 import type { InvoiceRow, OverviewRow } from './types'
+
+const PAGE_SIZE = 20 // the server sends one page at a time, so the list stays quick with thousands of rows
 
 const FILTERS = [
   { value: 'open', label: 'Still to collect' },
@@ -28,15 +30,14 @@ export function CustomerPayments({ weddingId, weddings, adding, onCloseAdd }: { 
   const [linkFor, setLinkFor] = useState<InvoiceRow | null>(null)
   const [recordFor, setRecordFor] = useState<InvoiceRow | null>(null)
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['finance', 'invoices', weddingId ?? 'all', filter],
-    queryFn: () => get<InvoiceRow[]>('/invoices/', { wedding: weddingId ?? undefined, status: filter || undefined }),
+  const [page, setPage] = useState(1)
+  const page_ = useQuery({
+    queryKey: ['finance', 'invoices', weddingId ?? 'all', filter, page],
+    queryFn: () => get<Page<InvoiceRow>>('/invoices/', { wedding: weddingId ?? undefined, status: filter || undefined, page, page_size: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   })
-  const everything = useQuery({
-    queryKey: ['finance', 'invoices', weddingId ?? 'all', ''],
-    queryFn: () => get<InvoiceRow[]>('/invoices/', { wedding: weddingId ?? undefined }),
-    enabled: adding,
-  })
+  const { isLoading, error, refetch } = page_
+  const data = page_.data?.results
   const del = useMutation({ mutationFn: (id: number) => remove(`/invoices/${id}/`), onSuccess: () => refresh() })
 
   return (
@@ -46,7 +47,7 @@ export function CustomerPayments({ weddingId, weddings, adding, onCloseAdd }: { 
           Collect from customers two ways: <b>send a payment link</b> (they pay online and it is recorded by itself) or <b>record a payment</b> you received in cash, UPI, bank transfer or cheque.
         </p>
         <div className="w-48">
-          <Select aria-label="Show invoices" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <Select aria-label="Show invoices" value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1) }}>
             {FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
@@ -150,7 +151,8 @@ export function CustomerPayments({ weddingId, weddings, adding, onCloseAdd }: { 
           onClose={() => setRecordFor(null)}
         />
       )}
-      {adding && <NewInvoiceModal weddingId={weddingId} weddings={weddings} existing={everything.data ?? data ?? []} onClose={onCloseAdd} />}
+      {page_.data && <Pager page={page} pageSize={PAGE_SIZE} total={page_.data.count} onPage={setPage} noun="invoices" />}
+      {adding && <NewInvoiceModal weddingId={weddingId} weddings={weddings} onClose={onCloseAdd} />}
     </section>
   )
 }

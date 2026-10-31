@@ -103,20 +103,18 @@ export interface LedgerRow {
   can_undo: boolean
 }
 
+/** A wedding in the Payments page's picker. */
 export interface OverviewRow {
   wedding_id: number
   title: string
   client_name: string
   date: string
-  invoiced_paise: number
-  received_paise: number
-  planned_expense_paise: number
-  paid_expense_paise: number
-  estimated_profit_paise: number
 }
 
+/** Totals and late counts, summed on the server for all weddings or one. */
 export interface Overview {
-  totals: Record<string, number>
+  totals: { invoiced_paise: number; received_paise: number; planned_expense_paise: number; paid_expense_paise: number; estimated_profit_paise: number; actual_profit_paise: number }
+  counts: { open_invoices: number; overdue_invoices: number; open_bills: number; overdue_bills: number }
   weddings: OverviewRow[]
 }
 
