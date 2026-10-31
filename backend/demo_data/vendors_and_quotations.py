@@ -71,9 +71,13 @@ def load():
     categories = {c.name: c for c in VendorCategory.objects.all()}
     vendors = {}
     for name, category, contact, phone, city in VENDORS:
-        vendors[name], _ = Vendor.objects.get_or_create(
-            name=name, defaults=dict(category=categories[category], contact_person=contact, phone=phone,
-                                     city=city, email=f"{phone}@vendors.example.com"))
+        details = dict(category=categories[category], contact_person=contact, phone=phone, city=city,
+                       email=f"{phone}@vendors.example.com")
+        vendors[name], created = Vendor.objects.get_or_create(name=name, defaults=details)
+        if not created:  # an earlier demo file may have made it with just a name: fill in what is missing
+            missing = {k: v for k, v in details.items() if k != "category" and not getattr(vendors[name], k)}
+            if missing:
+                Vendor.objects.filter(pk=vendors[name].pk).update(**missing)
 
     load_past_weddings(vendors)
     load_caterer_request(vendors, categories["Caterer"])

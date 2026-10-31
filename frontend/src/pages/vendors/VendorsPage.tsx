@@ -1,8 +1,9 @@
+import { MapPin, Phone, Star, UserRound } from 'lucide-react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { get, type Page } from '@/api/client'
-import { Badge, Button, Card, EmptyState, ErrorState, SearchBox, Spinner, Table, Td, Th, cn } from '@/components/common'
+import { Button, Card, EmptyState, ErrorState, SearchBox, Spinner, Table, Td, Th, cn } from '@/components/common'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Stars } from './Stars'
 import type { Vendor } from './types'
@@ -62,7 +63,7 @@ export default function VendorsPage() {
         </div>
       )}
 
-      <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filter by category">
+      <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" role="group" aria-label="Filter by category">
         <Chip active={categoryId === null} onClick={() => resetPage(setCategoryId)(null)}>
           All
         </Chip>
@@ -117,30 +118,33 @@ export default function VendorsPage() {
       {data && data.results.length > 0 && (
         <div className={cn(isFetching && 'opacity-70 transition-opacity')}>
           {view === 'cards' ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
               {data.results.map((v) => (
                 <Link key={v.id} to={`/vendors/${v.id}`} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-brand-500">
-                  <Card lift className="h-full">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-700">
-                          {v.name.charAt(0).toUpperCase()}
-                        </span>
-                        <h2 className="font-semibold text-slate-900">{v.name}</h2>
+                  <Card lift className="flex h-full flex-col p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-700">
+                        {v.name.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="truncate text-sm font-semibold text-slate-900" title={v.name}>{v.name}</h2>
+                        <p className="text-xs text-slate-500">{v.category_name}</p>
                       </div>
-                      <Badge tone="gray">{v.category_name}</Badge>
+                      {v.avg_rating !== null && (
+                        <span className="num flex shrink-0 items-center gap-1 text-xs font-medium text-slate-700">
+                          <Star size={13} className="fill-amber-400 text-amber-400" /> {v.avg_rating.toFixed(1)}
+                        </span>
+                      )}
                     </div>
-                    <div className="mt-2">
-                      <Stars value={v.avg_rating} />
+                    <div className="mt-3 space-y-1.5 text-xs text-slate-600">
+                      <div className="flex items-center gap-2"><UserRound size={13} className="shrink-0 text-slate-400" /><span className="truncate">{v.contact_person || 'No contact person'}</span></div>
+                      <div className="flex items-center gap-2"><Phone size={13} className="shrink-0 text-slate-400" /><span className="num">{v.phone || 'No phone'}</span></div>
+                      <div className="flex items-center gap-2"><MapPin size={13} className="shrink-0 text-slate-400" /><span className="truncate">{v.city || 'City not set'}</span></div>
                     </div>
-                    <dl className="mt-3 space-y-0.5 text-sm text-slate-600">
-                      <div>{v.contact_person || '—'}</div>
-                      <div>{v.phone}</div>
-                      <div>{v.city || 'City not set'}</div>
-                    </dl>
-                    <p className="mt-3 text-xs text-slate-500">
-                      {v.weddings_count} wedding{v.weddings_count === 1 ? '' : 's'} with us
-                    </p>
+                    <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500" style={{ marginTop: '0.875rem' }}>
+                      <span>{v.weddings_count} wedding{v.weddings_count === 1 ? '' : 's'} with us</span>
+                      {v.portal_account !== 'none' && <span className="text-emerald-600">Has login</span>}
+                    </div>
                   </Card>
                 </Link>
               ))}
@@ -217,8 +221,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'rounded-full border px-3 py-1 text-sm transition-colors',
-        active ? 'border-brand-500 bg-brand-50 font-medium text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+        'h-8 shrink-0 whitespace-nowrap rounded-lg border px-3 text-sm transition-colors',
+        active ? 'border-slate-900 bg-slate-900 font-medium text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
       )}
     >
       {children}

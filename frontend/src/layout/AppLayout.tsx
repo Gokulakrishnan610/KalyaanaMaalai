@@ -62,7 +62,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="app-shell relative isolate flex h-full">
+    <div className="app-shell relative isolate flex h-screen overflow-hidden">
       {/* soft drifting colour behind everything */}
       <div className="aurora pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <span className="-left-24 top-10 h-96 w-96 bg-brand-100" />
@@ -130,7 +130,7 @@ export function AppLayout() {
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-4 border-b border-slate-200 bg-white px-6">
           <form onSubmit={onSearch} className="relative max-w-md flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -167,7 +167,7 @@ export function AppLayout() {
             </button>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
+        <main className="min-h-0 flex-1 overflow-y-auto px-6 py-6 lg:px-8">
           {/* keyed by address, so every screen change replays the entrance animation */}
           <div key={location.pathname} className="page-enter mx-auto max-w-[1400px]">
             <Suspense fallback={<Spinner />}><Outlet /></Suspense>
