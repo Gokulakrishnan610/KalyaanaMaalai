@@ -35,6 +35,10 @@ export function PhotoSlider({ children }: { children: ReactNode }) {
               <img
                 src={slide.image}
                 alt=""
+                // the first photo is fetched straight away; the others wait until the browser is free
+                loading={i === 0 ? 'eager' : 'lazy'}
+                fetchPriority={i === 0 ? 'high' : 'low'}
+                decoding="async"
                 className={cn('absolute inset-0 h-full w-full object-cover', active && 'slow-zoom')}
                 onError={() => setMissing((m) => new Set(m).add(slide.image))}
               />
