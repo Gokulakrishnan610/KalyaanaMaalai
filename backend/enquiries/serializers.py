@@ -12,6 +12,7 @@ class EnquirySerializer(serializers.ModelSerializer):
     owner_name = serializers.CharField(source="owner.name", read_only=True, default=None)
 
     next_follow_up = serializers.SerializerMethodField()
+    portal_account = serializers.SerializerMethodField()
 
     class Meta:
         model = Enquiry
@@ -20,9 +21,15 @@ class EnquirySerializer(serializers.ModelSerializer):
             "budget_paise", "venue_city", "consultation_at", "notes", "expected_revenue_paise", "win_chance",
             "priority", "expected_close_date", "lost_reason", "next_follow_up", "client", "linked_client_name",
             "client_name", "spouse_email", "owner", "owner_name", "partner_name", "functions_wanted", "services_needed",
-            "preferred_contact", "profile_complete", "created_at",
+            "preferred_contact", "profile_complete", "portal_account", "created_at",
         ]
         read_only_fields = ["id", "client", "profile_complete", "created_at"]  # the client is set by "convert"
+
+    def get_portal_account(self, enquiry):
+        """none / invited / active: does this couple have a login on the customer website yet?"""
+        from portal.accounts import account_state
+
+        return account_state(getattr(enquiry, "portal_customer", None))
 
     def get_next_follow_up(self, enquiry):
         """Due time of the earliest follow-up that is not done yet (None if there is none)."""

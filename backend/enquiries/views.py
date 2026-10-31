@@ -64,6 +64,25 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         return Response({"client": ClientSerializer(client).data, "wedding_id": wedding.id if wedding else None})
 
 
+    @action(detail=True, methods=["post"])
+    def invite(self, request, pk=None):
+        """(Re)send the customer-website login to a converted client."""
+        from rest_framework.exceptions import ValidationError
+
+        from portal.accounts import account_state, ensure_customer, invite_customer
+
+        enquiry = self.get_object()
+        if enquiry.client_id is None:
+            raise ValidationError("Convert this enquiry to a client first.")
+        if not enquiry.email:
+            raise ValidationError("Add the couple's email address first, so we can send them the login.")
+        had_account = getattr(enquiry, "portal_customer", None) is not None
+        customer = ensure_customer(enquiry, enquiry.client, planner=request.user.name)  # emails a brand new account
+        if had_account:
+            invite_customer(customer, request.user.name)  # an existing one gets the email again
+        return Response({"portal_account": account_state(customer)})
+
+
 class FollowUpViewSet(viewsets.ModelViewSet):
     """Planned calls and meetings. Filter with ?enquiry=<id> and ?open=1 (not done yet)."""
 

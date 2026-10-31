@@ -8,7 +8,7 @@ class Customer(models.Model):
     name = models.CharField(max_length=120)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20)
-    password_hash = models.CharField(max_length=255)
+    password_hash = models.CharField(max_length=255, blank=True)  # empty until an invited client sets one
     # the CRM enquiry made when they signed up, and the client it becomes once the planner converts it
     enquiry = models.OneToOneField("enquiries.Enquiry", null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="portal_customer")
@@ -16,6 +16,7 @@ class Customer(models.Model):
                                related_name="portal_customers")
     created_at = models.DateTimeField(auto_now_add=True)
     last_login_at = models.DateTimeField(null=True, blank=True)
+    invited_at = models.DateTimeField(null=True, blank=True)  # when we last emailed them a link to set a password
 
     # lets Django REST Framework treat a Customer like a logged-in user
     is_authenticated = True
@@ -31,4 +32,27 @@ class Customer(models.Model):
         self.password_hash = make_password(raw)
 
     def check_password(self, raw: str) -> bool:
-        return check_password(raw, self.password_hash)
+        return bool(self.password_hash) and check_password(raw, self.password_hash)
+
+
+class VendorAccount(models.Model):
+    """A vendor's login for the vendor part of the website. Like Customer, it can never reach staff screens."""
+
+    vendor = models.OneToOneField("vendors.Vendor", on_delete=models.CASCADE, related_name="portal_account")
+    email = models.EmailField(unique=True)
+    password_hash = models.CharField(max_length=255, blank=True)
+    invited_at = models.DateTimeField(null=True, blank=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    is_authenticated = True
+    is_anonymous = False
+
+    def __str__(self):
+        return f"{self.vendor.name} <{self.email}>"
+
+    def set_password(self, raw: str) -> None:
+        self.password_hash = make_password(raw)
+
+    def check_password(self, raw: str) -> bool:
+        return bool(self.password_hash) and check_password(raw, self.password_hash)

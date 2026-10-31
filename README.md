@@ -104,7 +104,9 @@ backend/
   vendors/          caterers, decorators, DJs and their details
   quotations/       asking vendors for prices, comparing, picking the winner
   payments/         invoices, payment links, vendor bills, payment history
-  portal/           couples' accounts for the customer website (own login, own token)
+  portal/           logins for couples and vendors (own tokens, never valid on staff screens)
+  agreements/       service agreements signed online (emailed code, drawn signature, proof kept)
+  mailer/           every email we send: templates, a log, and the signals that send them
   ai_tools/         reading quotation PDFs and writing checklists with AI
   notifications/    alerts (bell icon, Telegram)
   incidents/        problems reported during weddings: assign, track, resolve
@@ -143,6 +145,24 @@ cd customer-site && npm install && npm run dev    # http://localhost:5174
 How it joins the CRM: a couple signs up, which creates an enquiry (source "Website") and alerts the planners. They then fill a 4-step profile (partner, date, city, guests, services, functions, budget, how to contact them). The answers land in the same enquiry and show in a "From the customer website" box in the staff form. When the planner converts the enquiry to a client, the couple's account is linked to it, and the invoices appear on the website with a Pay button. Pay opens the same payment-link page as the WhatsApp link, so there are three ways to pay: a link sent by WhatsApp, a payment typed in by the team, and paying inside the website.
 
 Customer logins are a different kind of token from staff logins, so one can never be used on the other's pages. Set `CUSTOMER_SITE_URL` in `backend/.env` if the site is not on port 5174, and `VITE_WHATSAPP` in `customer-site/.env` for the WhatsApp button.
+
+## Logins, agreements and emails
+
+Four kinds of people sign in, and each kind has its own kind of token, so one can never open another's pages:
+
+| Who | Where they sign in | What they see |
+|---|---|---|
+| Founder, planner, staff | main site, `localhost:5173/login` | the whole CRM (by role) |
+| Vendor | the same login page (it tries staff first, then vendor) | `/vendor`: their bookings and schedule, "I have arrived", quotation requests (they send their own price), payments, their details |
+| Couple | customer site, `localhost:5174` | their wedding status, profile, agreement, payments |
+
+**Couples we onboard ourselves** (phone call, Instagram, a referral): when the enquiry is converted to a client, a customer-site account is created from the enquiry's email, and an email goes out with a link to choose a password. A website sign-up already has an account. If an enquiry has no email, the enquiry form says so, and "Create and email login" is there once one is added.
+
+**Vendors**: adding a vendor with an email address creates their login at once. The staff member sees the generated password one time (and it is emailed to the vendor too). On the vendor page, "Send a new password" makes a new one.
+
+**Agreements**: converting an enquiry with "start the wedding project" makes a draft agreement filled from the wedding (guests, extra-guest rate, payment schedule, cancellation terms). The planner edits it on the Agreements page and sends it. The couple reads it on their account page, asks for a 6-digit code by email, types their name, draws their signature and ticks the box. We keep the name, time, internet address, signature and a SHA-256 fingerprint of the exact text, so a later change to a signed text is detected. A signed agreement cannot be edited or cancelled. The code works 10 minutes and locks after 5 wrong tries.
+
+**Emails**: 13 templates (enquiry received, welcome and login, password reset, agreement ready / code / signed, invoice, reminder, receipt, vendor login, quotation request, vendor booked, vendor paid). The Emails page shows each one with sample values and the recent send log. Mail goes through Celery; with `MOCK_EXTERNALS=true` it is printed instead of sent. Set `SMTP_*` and `MAIL_FROM` in `backend/.env` to send for real.
 
 ## Live updates (no refreshing)
 

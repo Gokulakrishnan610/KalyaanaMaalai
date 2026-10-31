@@ -34,11 +34,6 @@ def convert_to_client(enquiry: Enquiry, create_wedding: bool = False, title: str
     """
     if enquiry.client_id is None:
         enquiry.client = client_for(enquiry)
-    # a couple who signed up on the customer website can now see their invoices there
-    customer = getattr(enquiry, "portal_customer", None)
-    if customer is not None and customer.client_id is None:
-        customer.client = enquiry.client
-        customer.save(update_fields=["client"])
     enquiry.status = Status.WON
     enquiry.win_chance = 100
     enquiry.lost_reason = ""
@@ -56,4 +51,13 @@ def convert_to_client(enquiry: Enquiry, create_wedding: bool = False, title: str
                           guest_count=enquiry.guest_count, contracted_guests=enquiry.guest_count,
                           budget_paise=enquiry.budget_paise or 0),
         )
+    # everyone we convert gets an account on the customer website (and an email with the login), however they
+    # reached us. This comes after the wedding exists, so the email can name it.
+    from portal.accounts import ensure_customer
+
+    ensure_customer(enquiry, enquiry.client, planner=enquiry.owner.name if enquiry.owner_id else "")
+    if wedding is not None and not wedding.agreements.exists():
+        from agreements.services import create_draft
+
+        create_draft(wedding)  # the agreement is ready for the planner to check and send
     return enquiry.client, wedding

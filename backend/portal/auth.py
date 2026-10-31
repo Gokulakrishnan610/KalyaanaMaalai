@@ -8,19 +8,23 @@ from rest_framework.authentication import BaseAuthentication, get_authorization_
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission
 
-from portal.models import Customer
+from portal.models import Customer, VendorAccount
 
 TOKEN_DAYS = 7
 
 
-def make_token(customer: Customer) -> str:
+def make_token(account, kind: str = "customer") -> str:
     now = datetime.now(timezone.utc)
-    claims = {"customer_id": customer.pk, "typ": "customer", "iat": now, "exp": now + timedelta(days=TOKEN_DAYS)}
+    claims = {"account_id": account.pk, "customer_id": account.pk, "typ": kind, "iat": now,
+              "exp": now + timedelta(days=TOKEN_DAYS)}
     return jwt.encode(claims, settings.SECRET_KEY, algorithm="HS256")
 
 
 class CustomerAuthentication(BaseAuthentication):
-    """Reads "Authorization: Bearer <token>" and returns the Customer."""
+    """Reads "Authorization: Bearer <token>" and returns the Customer (or, for the vendor class below, the VendorAccount)."""
+
+    kind = "customer"
+    model = Customer
 
     def authenticate(self, request):
         parts = get_authorization_header(request).split()
@@ -30,11 +34,11 @@ class CustomerAuthentication(BaseAuthentication):
             claims = jwt.decode(parts[1], settings.SECRET_KEY, algorithms=["HS256"])
         except jwt.PyJWTError:
             raise AuthenticationFailed("Please log in again.") from None
-        if claims.get("typ") != "customer":
+        if claims.get("typ") != self.kind:
             raise AuthenticationFailed("Please log in again.")
         try:
-            return Customer.objects.get(pk=claims["customer_id"]), None
-        except (Customer.DoesNotExist, KeyError):
+            return self.model.objects.get(pk=claims["account_id"]), None
+        except (self.model.DoesNotExist, KeyError):
             raise AuthenticationFailed("Please log in again.") from None
 
     def authenticate_header(self, request):
@@ -44,3 +48,13 @@ class CustomerAuthentication(BaseAuthentication):
 class IsCustomer(BasePermission):
     def has_permission(self, request, view):
         return isinstance(request.user, Customer)
+
+
+class VendorAuthentication(CustomerAuthentication):
+    kind = "vendor"
+    model = VendorAccount
+
+
+class IsVendor(BasePermission):
+    def has_permission(self, request, view):
+        return isinstance(request.user, VendorAccount)

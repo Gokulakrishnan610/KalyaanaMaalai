@@ -47,15 +47,32 @@ class VendorViewSet(viewsets.ModelViewSet):
             return [allow_roles()()]
         return [read_for_all_write_for(Role.PLANNER)()]
 
+    @action(detail=True, methods=["post"])
+    def invite(self, request, pk=None):
+        """Create the vendor's login for the website and email them a link to choose a password."""
+        from portal.accounts import account_state, invite_vendor
+
+        account, password = invite_vendor(self.get_object())
+        return Response({"portal_account": account_state(account), "login": {"email": account.email, "password": password}})
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         duplicate = Vendor.objects.filter(name__iexact=data["name"], phone=data["phone"]).exists()
         vendor = serializer.save()
+        extra = {}
+        if vendor.email:  # a vendor with an email address gets a login straight away; the staff member sees it once
+            from portal.accounts import invite_vendor
+
+            try:
+                account, password = invite_vendor(vendor)
+                extra["login"] = {"email": account.email, "password": password}
+            except Exception:  # noqa: BLE001 - e.g. the email belongs to another vendor; the vendor is still saved
+                extra["login_error"] = "Could not create the vendor login. Use Send login on the vendor page."
         body = self.get_serializer(self.get_queryset().get(pk=vendor.pk)).data
         # still saved, but the screen can ask "is this the same vendor?"
-        body = {**body, "duplicate_warning": duplicate,
+        body = {**body, **extra, "duplicate_warning": duplicate,
                 "warnings": ["A vendor with this name and phone already exists."] if duplicate else []}
         return Response(body, status=status.HTTP_201_CREATED)
 

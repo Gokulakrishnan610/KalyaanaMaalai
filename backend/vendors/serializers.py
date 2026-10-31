@@ -16,12 +16,13 @@ class VendorSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     avg_rating = serializers.SerializerMethodField()
     weddings_count = serializers.SerializerMethodField()
+    portal_account = serializers.SerializerMethodField()
     phone = serializers.CharField(max_length=20)
 
     class Meta:
         model = Vendor
         fields = ["id", "name", "category_id", "category_name", "contact_person", "phone", "email", "city",
-                  "notes", "avg_rating", "weddings_count", "created_at"]
+                  "notes", "avg_rating", "weddings_count", "portal_account", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def validate_phone(self, value):
@@ -32,6 +33,11 @@ class VendorSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("Enter the vendor's name.")
         return value
+
+    def get_portal_account(self, vendor):
+        from portal.accounts import account_state
+
+        return account_state(getattr(vendor, "portal_account", None))
 
     def get_avg_rating(self, vendor):
         value = getattr(vendor, "avg_rating", None)

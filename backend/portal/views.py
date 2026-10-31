@@ -5,9 +5,9 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from portal import services
+from portal import accounts, services
 from portal.auth import CustomerAuthentication, IsCustomer, make_token
-from portal.models import Customer
+from portal.models import Customer, VendorAccount
 from portal.serializers import LoginSerializer, ProfileSerializer, SignupSerializer
 
 
@@ -84,3 +84,21 @@ class PayInvoice(CustomerView):
     @extend_schema(request=None, responses=dict)
     def post(self, request, pk):
         return Response({"path": services.pay_path(request.user, pk)})
+
+
+class ForgotPassword(OpenView):
+    @extend_schema(request=None, responses=dict)
+    def post(self, request):
+        accounts.request_reset(str(request.data.get("email", "")))
+        return Response({"detail": "If that email has an account, we have sent a link to it."})
+
+
+class SetPassword(OpenView):
+    """The page behind the emailed link: choose a password, and you are logged in."""
+
+    @extend_schema(request=None, responses=dict)
+    def post(self, request):
+        kind, account = accounts.set_password(str(request.data.get("token", "")), str(request.data.get("password", "")))
+        account.last_login_at = timezone.now()
+        account.save(update_fields=["last_login_at"])
+        return Response({"kind": kind, "token": make_token(account, kind)})
