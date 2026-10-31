@@ -71,6 +71,7 @@ class Enquiry(models.Model):
     class Meta:
         ordering = ["-created_at"]
         verbose_name_plural = "enquiries"
+        indexes = [models.Index(fields=["-created_at"], name="enquiry_newest_first")]
 
     def __str__(self):
         return f"{self.couple_name} ({self.get_status_display()})"

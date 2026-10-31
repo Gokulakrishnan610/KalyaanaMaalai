@@ -17,6 +17,7 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "-created_at"], name="notification_inbox")]
 
     def __str__(self):
         return self.message[:60]

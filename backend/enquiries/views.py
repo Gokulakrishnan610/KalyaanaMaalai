@@ -19,7 +19,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
 
     def filtered(self, with_status=True):
         """The enquiries matching ?source= and ?q= (and ?status= unless `with_status` is off, for the tab counts)."""
-        enquiries = Enquiry.objects.select_related("client", "owner").annotate(
+        enquiries = Enquiry.objects.select_related("client", "owner", "portal_customer").annotate(
             next_follow_up_at=Min("follow_ups__due_at", filter=Q(follow_ups__done_at__isnull=True)))
         params = self.request.query_params
         if with_status and params.get("status"):

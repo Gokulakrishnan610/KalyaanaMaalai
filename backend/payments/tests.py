@@ -352,3 +352,17 @@ class ReminderJobTests(FinanceTestCase):
         self.assertEqual(remind_due_payments(today + timedelta(days=1)), 2)  # next day: reminded again
         severities = set(Notification.objects.values_list("severity", flat=True))
         self.assertEqual(severities, {"critical", "warning"})
+
+
+class VendorBillListTests(FinanceTestCase):
+    def test_bills_can_be_filtered_on_the_server(self):
+        today = timezone.localdate()
+        Expense.objects.create(wedding=self.wedding, vendor=self.vendor, category="Caterer", description="Late", amount_paise=100,
+                               due_date=today - timedelta(days=3))
+        Expense.objects.create(wedding=self.wedding, vendor=self.vendor, category="Caterer", description="Done", amount_paise=100,
+                               status="PAID")
+        names = lambda status: sorted(b["description"] for b in self.client.get("/api/finance/vendor-bills/", {"status": status}).data)
+        self.assertEqual(names("open"), ["Late"])
+        self.assertEqual(names("overdue"), ["Late"])
+        self.assertEqual(names("paid"), ["Done"])
+        self.assertEqual(names(""), ["Done", "Late"])

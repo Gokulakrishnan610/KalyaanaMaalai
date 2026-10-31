@@ -223,7 +223,7 @@ class VendorBillSerializer(ExpenseSerializer):
 
     def get_instalments(self, obj):
         plans = sorted(obj.vendorpaymentplan_set.all(), key=lambda p: (p.part, p.pk))
-        paid = list(obj.payments.values_list("amount_paise", "reference"))
+        paid = [(p.amount_paise, p.reference) for p in obj.payments.all()]  # uses the prefetched payments
         from payments.services import allocate_to_plans
         covered = allocate_to_plans(plans, paid)
         return MilestoneSerializer(plans, many=True, context={"covered": covered}).data

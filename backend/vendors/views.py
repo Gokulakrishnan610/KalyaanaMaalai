@@ -30,7 +30,7 @@ class VendorViewSet(viewsets.ModelViewSet):
     pagination_class = VendorPagination
 
     def get_queryset(self):
-        vendors = with_stats(Vendor.objects.select_related("category"))
+        vendors = with_stats(Vendor.objects.select_related("category", "portal_account"))
         params = self.request.query_params
         if params.get("category_id"):
             vendors = vendors.filter(category_id=params["category_id"])

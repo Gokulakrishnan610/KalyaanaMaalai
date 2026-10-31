@@ -78,7 +78,7 @@ class Payment(models.Model):
     recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                     related_name="recorded_payments")  # who typed in an offline payment
     reference = models.CharField(max_length=120, blank=True)
-    paid_at = models.DateTimeField(default=timezone.now)
+    paid_at = models.DateTimeField(default=timezone.now, db_index=True)  # the history is listed newest first
     # the Idempotency-Key sent by the website (or "razorpay:<payment id>"): a retry returns the first payment
     retry_key = models.CharField(max_length=80, null=True, blank=True, unique=True)
 

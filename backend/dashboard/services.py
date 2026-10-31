@@ -131,7 +131,8 @@ def incident_summary():
 def pipeline_value():
     """What we expect to earn from open enquiries, weighted by the chance of winning them."""
     open_enquiries = Enquiry.objects.exclude(status__in=[Status.WON, Status.LOST])
-    total = sum((e.expected_revenue_paise or 0) * e.win_chance // 100 for e in open_enquiries)
+    # only the two numbers are read, not whole rows, so this stays quick with thousands of enquiries
+    total = sum((expected or 0) * chance // 100 for expected, chance in open_enquiries.values_list("expected_revenue_paise", "win_chance"))
     return {"pipeline_expected_paise": total, "stage_win_chances": {k.value: v for k, v in STAGE_WIN_CHANCE.items()}}
 
 
@@ -182,5 +183,15 @@ def build_summary():
             {"id": e.id, "couple_name": e.couple_name, "consultation_at": e.consultation_at}
             for e in consultations
         ],
-        "per_wedding": rows,
+        "per_wedding": focus_rows(rows, today),
     }
+
+
+def focus_rows(rows, today, upcoming=20, top=6):
+    """The weddings the dashboard shows: the next ones coming up, plus the biggest earners.
+
+    The totals above use every wedding; this keeps the answer small when there are hundreds of them."""
+    soon = sorted((r for r in rows if r["date"] >= today), key=lambda r: r["date"])[:upcoming]
+    biggest = sorted(rows, key=lambda r: r["revenue_paise"], reverse=True)[:top]
+    chosen = {r["wedding_id"]: r for r in soon + biggest}
+    return sorted(chosen.values(), key=lambda r: r["date"])

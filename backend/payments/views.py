@@ -302,13 +302,21 @@ class AllInvoices(FinanceView):
 
 
 class VendorBills(FinanceView):
-    """What we owe vendors, each bill with its instalments. ?wedding=<id>"""
+    """What we owe vendors, each bill with its instalments. ?wedding=<id>  ?status=open|overdue|paid"""
 
     @extend_schema(responses=VendorBillSerializer(many=True))
     def get(self, request):
-        queryset = with_paid(Expense.objects.select_related("vendor", "wedding").prefetch_related("vendorpaymentplan_set"))
+        queryset = with_paid(Expense.objects.select_related("vendor", "wedding").prefetch_related("vendorpaymentplan_set", "payments"))
         if request.query_params.get("wedding"):
             queryset = queryset.filter(wedding_id=request.query_params["wedding"])
+        # filtering here, not in the browser, keeps the answer small when there are hundreds of paid bills
+        wanted = request.query_params.get("status", "")
+        if wanted == "open":
+            queryset = queryset.exclude(status="PAID")
+        elif wanted == "overdue":
+            queryset = queryset.exclude(status="PAID").filter(due_date__lt=timezone.localdate())
+        elif wanted == "paid":
+            queryset = queryset.filter(status="PAID")
         return Response(VendorBillSerializer(queryset.order_by("due_date", "id"), many=True).data)
 
 
