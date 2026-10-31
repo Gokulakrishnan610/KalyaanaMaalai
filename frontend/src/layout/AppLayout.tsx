@@ -1,5 +1,7 @@
 import {
   Bell,
+  FileSignature,
+  Mail,
   CalendarHeart,
   LayoutDashboard,
   LogOut,
@@ -29,6 +31,8 @@ const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/quotations', label: 'Quotations', icon: FileText },
   { to: '/incidents', label: 'Incidents', icon: TriangleAlert },
   { to: '/payments', label: 'Payments', icon: Wallet },
+  { to: '/agreements', label: 'Agreements', icon: FileSignature },
+  { to: '/emails', label: 'Emails', icon: Mail },
   { to: '/notifications', label: 'Notifications', icon: Bell },
 ]
 

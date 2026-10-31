@@ -2,6 +2,8 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { RequireLogin } from '@/components/RequireLogin'
 import { AppLayout } from '@/layout/AppLayout'
 import CheckinPage from '@/pages/checkin/PublicCheckinPage'
+import AgreementsPage from '@/pages/agreements/AgreementsPage'
+import EmailsPage from '@/pages/emails/EmailsPage'
 import ClientPage from '@/pages/clients/ClientPage'
 import ClientsPage from '@/pages/clients/ClientsPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
@@ -13,6 +15,11 @@ import PublicPayPage from '@/pages/pay/PublicPayPage'
 import PaymentsPage from '@/pages/payments/PaymentsPage'
 import QuotationsPage from '@/pages/quotations/QuotationsPage'
 import RequestDetailPage from '@/pages/quotations/RequestDetailPage'
+import VendorAccountPage from '@/pages/vendor-portal/VendorAccountPage'
+import VendorBookingsPage from '@/pages/vendor-portal/VendorBookingsPage'
+import { VendorLayout } from '@/pages/vendor-portal/VendorLayout'
+import VendorPaymentsPage from '@/pages/vendor-portal/VendorPaymentsPage'
+import VendorRequestsPage from '@/pages/vendor-portal/VendorRequestsPage'
 import VendorProfilePage from '@/pages/vendors/VendorProfilePage'
 import VendorsPage from '@/pages/vendors/VendorsPage'
 import WeddingDetailPage from '@/pages/weddings/WeddingDetailPage'
@@ -26,6 +33,12 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/checkin/:token" element={<CheckinPage />} />
         <Route path="/pay/:token" element={<PublicPayPage />} />
+        <Route path="/vendor" element={<VendorLayout />}>
+          <Route index element={<VendorBookingsPage />} />
+          <Route path="requests" element={<VendorRequestsPage />} />
+          <Route path="payments" element={<VendorPaymentsPage />} />
+          <Route path="account" element={<VendorAccountPage />} />
+        </Route>
         <Route element={<RequireLogin />}>
           <Route element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
@@ -40,6 +53,8 @@ export default function App() {
             <Route path="quotations/:id" element={<RequestDetailPage />} />
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="payments" element={<PaymentsPage />} />
+            <Route path="agreements" element={<AgreementsPage />} />
+            <Route path="emails" element={<EmailsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
         </Route>

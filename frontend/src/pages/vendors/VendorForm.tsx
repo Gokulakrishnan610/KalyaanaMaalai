@@ -5,7 +5,7 @@ import { Button, Input, Modal, Select } from '@/components/common'
 import type { Vendor } from './types'
 import { useVendorCategories } from './useVendorCategories'
 
-type SavedVendor = Vendor & { duplicate_warning?: boolean }
+export type SavedVendor = Vendor & { duplicate_warning?: boolean; login?: { email: string; password: string }; login_error?: string }
 
 interface Props {
   open: boolean

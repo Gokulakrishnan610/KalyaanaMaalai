@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { get, remove } from '@/api/client'
+import { get, post, remove } from '@/api/client'
 import { Badge, Button, Card, CardTitle, CountUp, EmptyState, ErrorState, Spinner, cn } from '@/components/common'
 import { formatDate } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
+import { LoginDetailsModal, type VendorLogin } from './LoginDetailsModal'
 import { RateVendorModal } from './RateVendorModal'
 import { Stars } from './Stars'
 import type { Performance, VendorProfile } from './types'
@@ -22,10 +23,19 @@ export default function VendorProfilePage() {
   const [tab, setTab] = useState<Tab>('Overview')
   const [editing, setEditing] = useState(false)
   const [rating, setRating] = useState<number | null>(null)
+  const [login, setLogin] = useState<VendorLogin | null>(null)
 
   const { data: vendor, isLoading, error, refetch } = useQuery({
     queryKey: ['vendor-profile', id],
     queryFn: () => get<VendorProfile>(`/vendors/${id}/`),
+  })
+
+  const invite = useMutation({
+    mutationFn: () => post<{ login: VendorLogin }>(`/vendors/${id}/invite/`),
+    onSuccess: (res) => {
+      setLogin(res.login)
+      queryClient.invalidateQueries({ queryKey: ['vendor-profile', id] })
+    },
   })
 
   const del = useMutation({
@@ -87,6 +97,24 @@ export default function VendorProfilePage() {
       </div>
 
       {tab === 'Overview' && <Overview vendor={vendor} />}
+      {tab === 'Overview' && (
+        <Card>
+          <CardTitle>Vendor login</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span className="text-slate-600">
+              {vendor.portal_account === 'none' && 'No login yet. Create one so this vendor can see their bookings and send quotations.'}
+              {vendor.portal_account === 'invited' && 'Login created. The vendor has not signed in yet.'}
+              {vendor.portal_account === 'active' && 'The vendor has signed in.'}
+            </span>
+            <Button variant="secondary" loading={invite.isPending} disabled={!vendor.email} onClick={() => invite.mutate()}>
+              {vendor.portal_account === 'none' ? 'Create login' : 'Send a new password'}
+            </Button>
+          </div>
+          {!vendor.email && <p className="mt-2 text-xs text-amber-600">Add an email address to this vendor first (Edit).</p>}
+          {invite.error && <p className="mt-2 text-xs text-red-600">{invite.error.message}</p>}
+        </Card>
+      )}
+      {login && <LoginDetailsModal vendorName={vendor.name} login={login} onClose={() => setLogin(null)} />}
       {tab === 'Weddings' && <WeddingsList vendor={vendor} onRate={setRating} />}
       {tab === 'Quotations' && <QuotationsList vendor={vendor} />}
       {tab === 'Performance' && <Scorecard performance={vendor.performance} />}

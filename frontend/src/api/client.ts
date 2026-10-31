@@ -1,6 +1,9 @@
 import axios, { AxiosError } from 'axios'
 
 export const TOKEN_KEY = 'km_token'
+/** A vendor logs in on the same page as our staff, but gets their own kind of token, kept apart from the staff one. */
+export const VENDOR_TOKEN_KEY = 'km_vendor_token'
+const isVendorCall = (url?: string) => Boolean(url?.includes('/portal/vendor/'))
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
@@ -26,7 +29,7 @@ export class ApiError extends Error {
 }
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(isVendorCall(config.url) ? VENDOR_TOKEN_KEY : TOKEN_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -52,8 +55,8 @@ api.interceptors.response.use(
   (err: AxiosError) => {
     const status = err.response?.status ?? 0
     // an expired token sends the user back to the login page (but a wrong password just shows its error)
-    if (status === 401 && !err.config?.url?.includes('/auth/login')) {
-      localStorage.removeItem(TOKEN_KEY)
+    if (status === 401 && !err.config?.url?.includes('/auth/login') && !err.config?.url?.includes('/vendor/login')) {
+      localStorage.removeItem(isVendorCall(err.config?.url) ? VENDOR_TOKEN_KEY : TOKEN_KEY)
       window.location.assign('/login')
     }
     return Promise.reject(readError(status, err.response?.data, err.message))

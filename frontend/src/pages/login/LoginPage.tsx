@@ -5,7 +5,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { Button, Emblem, Input } from '@/components/common'
 import { useLogin } from '@/login/LoginContext'
-import { ApiError } from '@/api/client'
+import { ApiError, post, VENDOR_TOKEN_KEY } from '@/api/client'
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -26,6 +26,7 @@ export default function LoginPage() {
   } = useForm<Form>({ resolver: zodResolver(schema) })
 
   if (user) return <Navigate to="/" replace />
+  if (localStorage.getItem(VENDOR_TOKEN_KEY)) return <Navigate to="/vendor" replace />
 
   const onSubmit = async (values: Form) => {
     setError('')
@@ -33,7 +34,15 @@ export default function LoginPage() {
       await login(values.email, values.password)
       navigate((location.state as { from?: string } | null)?.from ?? '/', { replace: true })
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not reach the server')
+      if (!(e instanceof ApiError) || (e.status !== 400 && e.status !== 401)) return setError('Could not reach the server')
+      // not one of our team: maybe a vendor, who signs in on this same page
+      try {
+        const res = await post<{ token: string }>('/portal/vendor/login/', values)
+        localStorage.setItem(VENDOR_TOKEN_KEY, res.token)
+        navigate('/vendor', { replace: true })
+      } catch {
+        setError('Wrong email or password.')
+      }
     }
   }
 
@@ -60,7 +69,7 @@ export default function LoginPage() {
             <p className="text-xs text-slate-500">Shaandaar Events · wedding planning</p>
           </div>
         </div>
-        <p className="mb-5 text-sm text-slate-500">Welcome back. Sign in to continue.</p>
+        <p className="mb-5 text-sm text-slate-500">Welcome back. Team members and vendors sign in here.</p>
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <Input label="Email" type="email" autoComplete="username" error={errors.email?.message} {...register('email')} />
           <Input

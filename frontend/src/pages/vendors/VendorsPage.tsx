@@ -6,6 +6,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, SearchBox, Spinner, Table,
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Stars } from './Stars'
 import type { Vendor } from './types'
+import { LoginDetailsModal, type VendorLogin } from './LoginDetailsModal'
 import { VendorForm } from './VendorForm'
 import { useVendorCategories } from './useVendorCategories'
 
@@ -19,6 +20,7 @@ export default function VendorsPage() {
   const [page, setPage] = useState(1)
   const [adding, setAdding] = useState(false)
   const [notice, setNotice] = useState('')
+  const [newLogin, setNewLogin] = useState<{ name: string; login: VendorLogin } | null>(null)
   // wait until typing pauses before asking the server
   const q = useDebouncedValue(search.trim())
   const cityFilter = useDebouncedValue(city.trim())
@@ -192,15 +194,17 @@ export default function VendorsPage() {
         </div>
       )}
 
+      {newLogin && <LoginDetailsModal vendorName={newLogin.name} login={newLogin.login} onClose={() => setNewLogin(null)} />}
       {adding && (
         <VendorForm
           open
           defaultCategoryId={categoryId ?? undefined}
           onClose={() => setAdding(false)}
-          onSaved={(v) =>
-            v.duplicate_warning &&
-            setNotice(`Saved, but a vendor named "${v.name}" with the same phone number already exists. Check it is not a duplicate.`)
-          }
+          onSaved={(v) => {
+            if (v.login) setNewLogin({ name: v.name, login: v.login })
+            if (v.login_error) setNotice(v.login_error)
+            if (v.duplicate_warning) setNotice(`Saved, but a vendor named "${v.name}" with the same phone number already exists. Check it is not a duplicate.`)
+          }}
         />
       )}
     </div>

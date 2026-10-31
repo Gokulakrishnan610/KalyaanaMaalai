@@ -15,6 +15,7 @@ export interface Vendor {
   notes: string
   avg_rating: number | null
   weddings_count: number
+  portal_account: 'none' | 'invited' | 'active'
   created_at: string
 }
 
