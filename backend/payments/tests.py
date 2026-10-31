@@ -277,8 +277,23 @@ class FinancialsTests(FinanceTestCase):
     def test_overview_lists_every_wedding(self):
         self.invoice(1000)
         res = self.client.get("/api/finance/overview/").data
-        self.assertEqual(res["weddings"][0]["invoiced_paise"], 1000 * R)
+        self.assertEqual(res["weddings"][0]["wedding_id"], self.wedding.pk)
         self.assertEqual(res["totals"]["invoiced_paise"], 1000 * R)
+        self.assertEqual(res["counts"]["open_invoices"], 1)
+
+    def test_overview_can_be_for_one_wedding(self):
+        self.invoice(1000)
+        other = Wedding.objects.create(title="Other", client=self.wedding.client, start_date=self.wedding.start_date,
+                                       end_date=self.wedding.end_date, city="Pune", guest_count=10, contracted_guests=10)
+        self.assertEqual(self.client.get("/api/finance/overview/", {"wedding": other.pk}).data["totals"]["invoiced_paise"], 0)
+
+    def test_invoices_come_in_pages_when_asked(self):
+        for _ in range(25):
+            self.invoice(100)
+        first = self.client.get("/api/invoices/", {"page": 1}).data
+        self.assertEqual((first["count"], len(first["results"])), (25, 20))
+        self.assertEqual(len(self.client.get("/api/invoices/", {"page": 2}).data["results"]), 5)
+        self.assertEqual(len(self.client.get("/api/invoices/").data), 25)  # no page asked: the plain list, as before
 
 
 @override_settings(MOCK_EXTERNALS=True)

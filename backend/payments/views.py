@@ -232,12 +232,18 @@ class UpcomingPayments(FinanceView):
 
 
 class FinanceOverview(FinanceView):
+    """The four totals and the late counts for all weddings, or one with ?wedding=<id>, plus the list of weddings for
+    the picker. Everything is summed in the database, so the answer stays small however many weddings there are."""
+
     @extend_schema(responses=dict)
     def get(self, request):
-        rows = services.overview()
-        keys = ("invoiced_paise", "received_paise", "planned_expense_paise", "paid_expense_paise",
-                "estimated_profit_paise", "actual_profit_paise")
-        return Response({"totals": {key: sum(r[key] for r in rows) for key in keys}, "weddings": rows})
+        wedding_id = request.query_params.get("wedding") or None
+        weddings = Wedding.objects.select_related("client").order_by("-start_date")
+        return Response({
+            **services.money_totals(wedding_id),
+            "weddings": [{"wedding_id": w.pk, "title": w.title, "client_name": w.client.couple_name, "date": w.start_date}
+                         for w in weddings],
+        })
 
 
 # ---------------------------------------------------------------- Razorpay
@@ -282,6 +288,15 @@ class RazorpayVerify(FinanceView):
 
 # ---------------------------------------------------------------- lists for the Payments page
 
+def paged(request, queryset, serializer):
+    """A page of 20 (?page=, ?page_size=) when the screen asks for one; the whole list otherwise, for small lookups
+    such as one wedding's invoices."""
+    if "page" not in request.query_params:
+        return Response(serializer(queryset, many=True).data)
+    paginator = StandardPagination()
+    return paginator.get_paginated_response(serializer(paginator.paginate_queryset(queryset, request), many=True).data)
+
+
 class AllInvoices(FinanceView):
     """Customer invoices across weddings. ?wedding=<id>  ?status=open|unpaid|partial|paid|overdue"""
 
@@ -298,7 +313,7 @@ class AllInvoices(FinanceView):
             queryset = queryset.exclude(status="PAID").filter(due_date__lt=timezone.localdate())
         elif wanted in ("unpaid", "partial", "paid"):
             queryset = queryset.filter(status=wanted.upper())
-        return Response(InvoiceRowSerializer(queryset.order_by("due_date", "id"), many=True).data)
+        return paged(request, queryset.order_by("due_date", "id"), InvoiceRowSerializer)
 
 
 class VendorBills(FinanceView):
@@ -317,7 +332,7 @@ class VendorBills(FinanceView):
             queryset = queryset.exclude(status="PAID").filter(due_date__lt=timezone.localdate())
         elif wanted == "paid":
             queryset = queryset.filter(status="PAID")
-        return Response(VendorBillSerializer(queryset.order_by("due_date", "id"), many=True).data)
+        return paged(request, queryset.order_by("due_date", "id"), VendorBillSerializer)
 
 
 class PaymentLedger(FinanceView):

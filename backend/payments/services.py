@@ -503,6 +503,28 @@ def upcoming_payments(days: int = 14, wedding_id: int | None = None, today=None)
     return sorted(items, key=lambda item: (item["due_date"], item["id"]))
 
 
+def money_totals(wedding_id=None) -> dict:
+    """Totals and late counts, for every wedding or one. Sums are done in the database."""
+    def scoped(queryset):
+        return queryset.filter(wedding_id=wedding_id) if wedding_id else queryset
+
+    def total(queryset):
+        return scoped(queryset).aggregate(t=Coalesce(Sum("amount_paise"), 0))["t"]
+
+    today = timezone.localdate()
+    invoiced, planned = total(Invoice.objects.all()), total(Expense.objects.all())
+    received = total(Payment.objects.filter(direction=Payment.Direction.IN))
+    paid_out = total(Payment.objects.filter(direction=Payment.Direction.OUT))
+    open_invoices, open_bills = scoped(Invoice.objects.exclude(status="PAID")), scoped(Expense.objects.exclude(status="PAID"))
+    return {
+        "totals": {"invoiced_paise": invoiced, "received_paise": received, "planned_expense_paise": planned,
+                   "paid_expense_paise": paid_out, "estimated_profit_paise": invoiced - planned,
+                   "actual_profit_paise": received - paid_out},
+        "counts": {"open_invoices": open_invoices.count(), "overdue_invoices": open_invoices.filter(due_date__lt=today).count(),
+                   "open_bills": open_bills.count(), "overdue_bills": open_bills.filter(due_date__lt=today).count()},
+    }
+
+
 def overview() -> list[dict]:
     """Profit of every wedding (the Finance page and the dashboard use the same sums)."""
     invoiced = _by_wedding(Invoice.objects.all())
