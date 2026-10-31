@@ -25,3 +25,12 @@ export function toLocalInput(iso: string | null | undefined): string {
 export function fromLocalInput(value: string): string | null {
   return value ? new Date(value).toISOString() : null
 }
+
+/** "5 min ago", "2 h ago", "3 days ago" */
+export function timeAgo(iso: string): string {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`
+  return `${Math.round(minutes / 1440)} days ago`
+}

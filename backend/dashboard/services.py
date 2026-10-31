@@ -5,10 +5,11 @@ from django.db.models import Count, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from enquiries.models import Enquiry, Status
+from enquiries.models import STAGE_WIN_CHANCE, Enquiry, FollowUp, Status
+from notifications.models import Notification
 from payments.models import Expense, Invoice, Payment, PayStatus
 from tasks.models import Stage, Task
-from weddings.models import VendorArrival, Wedding
+from weddings.models import VendorArrival, Wedding, WeddingStatus
 
 
 def _sum_by_wedding(queryset, field="amount_paise"):
@@ -74,6 +75,46 @@ def upcoming_vendor_payments(today, days=7):
     ]
 
 
+def recent_activity(limit=8):
+    """The latest things that happened, newest first, for the dashboard's activity feed."""
+    events = []
+    for e in Enquiry.objects.order_by("-created_at")[:limit]:
+        events.append({"kind": "enquiry", "text": f"New enquiry from {e.couple_name} via {e.get_source_display()}",
+                       "at": e.created_at})
+    for p in Payment.objects.select_related("wedding").order_by("-paid_at")[:limit]:
+        verb = "received for" if p.direction == Payment.Direction.IN else "paid out for"
+        events.append({"kind": "payment", "text": f"Payment of ₹{p.amount_paise / 100:,.0f} {verb} {p.wedding.title}",
+                       "at": p.paid_at})
+    arrivals = VendorArrival.objects.filter(arrived_at__isnull=False).select_related("vendor", "wedding")
+    for a in arrivals.order_by("-arrived_at")[:limit]:
+        events.append({"kind": "vendor", "text": f"{a.vendor.name} arrived ({a.get_status_display().lower()}) at {a.wedding.title}",
+                       "at": a.arrived_at})
+    for n in Notification.objects.order_by("-created_at")[:limit]:
+        events.append({"kind": "alert", "text": n.message, "at": n.created_at})
+    return sorted(events, key=lambda event: event["at"], reverse=True)[:limit]
+
+
+def follow_up_summary(now):
+    """Open follow-ups: how many are late and the next few coming up."""
+    open_ones = FollowUp.objects.filter(done_at__isnull=True).select_related("enquiry")
+    upcoming = open_ones.order_by("due_at")[:6]
+    return {
+        "overdue_follow_ups": open_ones.filter(due_at__lt=now).count(),
+        "upcoming_follow_ups": [
+            {"id": f.id, "enquiry_id": f.enquiry_id, "couple_name": f.enquiry.couple_name, "kind": f.kind,
+             "summary": f.summary, "due_at": f.due_at, "overdue": f.due_at < now}
+            for f in upcoming
+        ],
+    }
+
+
+def pipeline_value():
+    """What we expect to earn from open enquiries, weighted by the chance of winning them."""
+    open_enquiries = Enquiry.objects.exclude(status__in=[Status.WON, Status.LOST])
+    total = sum((e.expected_revenue_paise or 0) * e.win_chance // 100 for e in open_enquiries)
+    return {"pipeline_expected_paise": total, "stage_win_chances": {k.value: v for k, v in STAGE_WIN_CHANCE.items()}}
+
+
 def build_summary():
     now = timezone.now()
     today = timezone.localdate()
@@ -87,6 +128,7 @@ def build_summary():
     total_enquiries = sum(item["count"] for item in by_source)
     won = Enquiry.objects.filter(status=Status.WON).count()
 
+    open_tasks = Task.objects.exclude(stage=Stage.DONE)
     consultations = Enquiry.objects.filter(consultation_at__gte=now).order_by("consultation_at")[:5]
     return {
         "active_enquiries": Enquiry.objects.exclude(status__in=[Status.WON, Status.LOST]).count(),
@@ -99,6 +141,14 @@ def build_summary():
             {"id": r["wedding_id"], "title": r["title"], "date": r["date"]}
             for r in sorted((r for r in rows if r["date"] >= today), key=lambda r: r["date"])[:5]
         ],
+        **follow_up_summary(now),
+        **pipeline_value(),
+        "total_weddings": len(rows),
+        "ongoing_weddings": Wedding.objects.exclude(
+            status__in=[WeddingStatus.COMPLETED, WeddingStatus.CANCELLED]).count(),
+        "open_tasks": open_tasks.count(),
+        "overdue_tasks": open_tasks.filter(due_date__lt=today).count(),
+        "recent_activity": recent_activity(),
         "total_revenue_paise": revenue,
         "total_received_paise": received,
         "total_expenses_paise": expenses,

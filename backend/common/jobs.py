@@ -6,4 +6,6 @@ To add one, write a normal function in your own app and add a line below, e.g.
 Use `minutes` for "every N minutes" or `hour` for "every day at that hour (UTC)".
 """
 
-JOBS: list[dict] = []
+JOBS: list[dict] = [
+    {"function": "weddings.jobs.mark_late_vendors", "minutes": 1},
+]

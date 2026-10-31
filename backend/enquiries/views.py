@@ -1,12 +1,13 @@
-from django.db.models import Q
+from django.db.models import Min, Q
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from clients.serializers import ClientSerializer
 from common.permissions import Role, allow_roles, read_for_all_write_for
-from enquiries.models import Enquiry
-from enquiries.serializers import ConvertSerializer, EnquirySerializer
+from enquiries.models import Enquiry, FollowUp
+from enquiries.serializers import ConvertSerializer, EnquirySerializer, FollowUpSerializer
 from enquiries.services import convert_to_client
 
 
@@ -16,7 +17,8 @@ class EnquiryViewSet(viewsets.ModelViewSet):
     serializer_class = EnquirySerializer
 
     def get_queryset(self):
-        enquiries = Enquiry.objects.select_related("client", "owner")
+        enquiries = Enquiry.objects.select_related("client", "owner").annotate(
+            next_follow_up_at=Min("follow_ups__due_at", filter=Q(follow_ups__done_at__isnull=True)))
         params = self.request.query_params
         if params.get("status"):
             enquiries = enquiries.filter(status=params["status"])
@@ -24,7 +26,7 @@ class EnquiryViewSet(viewsets.ModelViewSet):
             enquiries = enquiries.filter(source=params["source"])
         if params.get("q"):
             enquiries = enquiries.filter(Q(couple_name__icontains=params["q"]) | Q(phone__icontains=params["q"]))
-        return enquiries
+        return enquiries.order_by("-created_at")
 
     def get_permissions(self):
         if self.action == "destroy":
@@ -42,3 +44,34 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         options.is_valid(raise_exception=True)
         client, wedding = convert_to_client(self.get_object(), **options.validated_data)
         return Response({"client": ClientSerializer(client).data, "wedding_id": wedding.id if wedding else None})
+
+
+class FollowUpViewSet(viewsets.ModelViewSet):
+    """Planned calls and meetings. Filter with ?enquiry=<id> and ?open=1 (not done yet)."""
+
+    serializer_class = FollowUpSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        follow_ups = FollowUp.objects.select_related("enquiry")
+        params = self.request.query_params
+        if params.get("enquiry"):
+            follow_ups = follow_ups.filter(enquiry_id=params["enquiry"])
+        if params.get("open"):
+            follow_ups = follow_ups.filter(done_at__isnull=True)
+        return follow_ups
+
+    def get_permissions(self):
+        return [read_for_all_write_for(Role.PLANNER)()]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def done(self, request, pk=None):
+        """Tick a follow-up off. Doing it twice keeps the first time."""
+        follow_up = self.get_object()
+        if follow_up.done_at is None:
+            follow_up.done_at = timezone.now()
+            follow_up.save(update_fields=["done_at"])
+        return Response(FollowUpSerializer(follow_up).data)

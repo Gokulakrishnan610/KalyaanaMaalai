@@ -19,6 +19,21 @@ class Status(models.TextChoices):
     LOST = "LOST", "Lost"
 
 
+class LostReason(models.TextChoices):
+    BUDGET = "BUDGET", "Budget too low"
+    COMPETITOR = "COMPETITOR", "Chose another planner"
+    DATE = "DATE", "Date not available"
+    NO_RESPONSE = "NO_RESPONSE", "No response"
+    OTHER = "OTHER", "Other"
+
+
+# How likely a couple is to book at each stage (like Odoo's stage probability). Won is 100, Lost is 0.
+STAGE_WIN_CHANCE = {
+    Status.NEW: 10, Status.CONTACTED: 20, Status.CONSULTATION: 40,
+    Status.PROPOSAL: 60, Status.WON: 100, Status.LOST: 0,
+}
+
+
 class Enquiry(models.Model):
     """A couple's first contact, before they become a client."""
 
@@ -33,6 +48,11 @@ class Enquiry(models.Model):
     venue_city = models.CharField(max_length=120, blank=True)
     consultation_at = models.DateTimeField(null=True, blank=True)  # first meeting
     notes = models.TextField(blank=True)
+    expected_revenue_paise = models.BigIntegerField(null=True, blank=True)  # what we expect to earn from this wedding
+    win_chance = models.PositiveSmallIntegerField(default=10)  # percent
+    priority = models.PositiveSmallIntegerField(default=0)  # 0 to 3 stars
+    expected_close_date = models.DateField(null=True, blank=True)  # when we expect the couple to decide
+    lost_reason = models.CharField(max_length=12, choices=LostReason.choices, blank=True)
     client = models.ForeignKey("clients.Client", null=True, blank=True, on_delete=models.SET_NULL,
                                related_name="enquiries")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
@@ -45,3 +65,28 @@ class Enquiry(models.Model):
 
     def __str__(self):
         return f"{self.couple_name} ({self.get_status_display()})"
+
+
+class FollowUp(models.Model):
+    """A planned call, meeting or message for an enquiry (Odoo calls these activities)."""
+
+    class Kind(models.TextChoices):
+        CALL = "CALL", "Call"
+        MEETING = "MEETING", "Meeting"
+        WHATSAPP = "WHATSAPP", "WhatsApp message"
+        EMAIL = "EMAIL", "Email"
+        TODO = "TODO", "To do"
+
+    enquiry = models.ForeignKey(Enquiry, on_delete=models.CASCADE, related_name="follow_ups")
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.CALL)
+    summary = models.CharField(max_length=255)
+    due_at = models.DateTimeField(db_index=True)
+    done_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["done_at", "due_at"]  # open ones first, soonest first
+
+    def __str__(self):
+        return f"{self.get_kind_display()}: {self.summary}"
