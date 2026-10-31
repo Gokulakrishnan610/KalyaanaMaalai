@@ -1,3 +1,6 @@
+import secrets
+
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -71,7 +74,9 @@ class Payment(models.Model):
     expense = models.ForeignKey(Expense, null=True, blank=True, on_delete=models.PROTECT, related_name="payments")
     direction = models.CharField(max_length=3, choices=Direction.choices)
     amount_paise = models.BigIntegerField()
-    method = models.CharField(max_length=20)  # cash, UPI, bank, card, Razorpay
+    method = models.CharField(max_length=20)  # cash, UPI, bank, cheque, card, Razorpay
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name="recorded_payments")  # who typed in an offline payment
     reference = models.CharField(max_length=120, blank=True)
     paid_at = models.DateTimeField(default=timezone.now)
     # the Idempotency-Key sent by the website (or "razorpay:<payment id>"): a retry returns the first payment
@@ -95,3 +100,35 @@ class VendorPaymentPlan(models.Model):
     due_date = models.DateField(null=True, blank=True, db_index=True)
     status = models.CharField(max_length=8, choices=PayStatus.choices, default=PayStatus.UNPAID, db_index=True)
     expense = models.ForeignKey(Expense, null=True, blank=True, on_delete=models.SET_NULL)
+
+
+def new_link_token() -> str:
+    return secrets.token_urlsafe(24)  # about 190 bits: cannot be guessed
+
+
+class PaymentLink(models.Model):
+    """A link the customer opens to pay an invoice online. Paying it records the payment automatically."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE", "Waiting for payment"
+        PAID = "PAID", "Paid"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="links")
+    token = models.CharField(max_length=64, unique=True, default=new_link_token)
+    amount_paise = models.BigIntegerField()  # what the customer is asked to pay (never more than the invoice owes)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE, db_index=True)
+    expires_at = models.DateTimeField()
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    payment = models.OneToOneField(Payment, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="payment_link")
+    razorpay_order_id = models.CharField(max_length=80, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.CheckConstraint(condition=Q(amount_paise__gt=0), name="link_amount_is_positive")]
+
+    def __str__(self):
+        return f"Link for invoice {self.invoice_id} ({self.status})"

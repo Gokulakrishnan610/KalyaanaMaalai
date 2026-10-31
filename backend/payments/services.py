@@ -18,7 +18,8 @@ from weddings.models import Wedding
 
 logger = logging.getLogger(__name__)
 
-METHODS = ("CASH", "UPI", "BANK", "CARD", "RAZORPAY")
+METHODS = ("CASH", "UPI", "BANK", "CHEQUE", "CARD", "RAZORPAY")
+MANUAL_METHODS = ("CASH", "UPI", "BANK", "CHEQUE", "CARD")  # what a person can type in; RAZORPAY comes only from the gateway
 DUPLICATE_WINDOW_DAYS = 7
 
 
@@ -149,7 +150,7 @@ def _insert_payment(**fields) -> tuple[Payment, bool]:
 
 
 def record_invoice_payment(invoice_id: int, amount_paise: int, method: str, reference: str = "", paid_at=None,
-                           idempotency_key: str | None = None) -> tuple[Payment, bool]:
+                           idempotency_key: str | None = None, recorded_by=None) -> tuple[Payment, bool]:
     """Money received from the couple. Returns (payment, created); created is False for a replayed key."""
     method = _validate_method(method)
     with transaction.atomic():
@@ -162,14 +163,15 @@ def record_invoice_payment(invoice_id: int, amount_paise: int, method: str, refe
         payment, created = _insert_payment(
             wedding_id=invoice.wedding_id, invoice=invoice, direction=Payment.Direction.IN,
             amount_paise=amount_paise, method=method, reference=reference or "",
-            paid_at=paid_at or timezone.now(), retry_key=idempotency_key or None)
+            paid_at=paid_at or timezone.now(), retry_key=idempotency_key or None,
+            recorded_by_id=getattr(recorded_by, "pk", None))
         recompute_invoice(invoice)
     return payment, created
 
 
 def record_expense_payment(expense_id: int, amount_paise: int, method: str, reference: str = "", paid_at=None,
-                           idempotency_key: str | None = None, milestone: VendorPaymentPlan | None = None
-                           ) -> tuple[Payment, bool]:
+                           idempotency_key: str | None = None, milestone: VendorPaymentPlan | None = None,
+                           recorded_by=None) -> tuple[Payment, bool]:
     """Money paid to a vendor. `milestone` tags the payment as one of the advance / final instalments."""
     method = _validate_method(method)
     with transaction.atomic():
@@ -187,9 +189,34 @@ def record_expense_payment(expense_id: int, amount_paise: int, method: str, refe
         payment, created = _insert_payment(
             wedding_id=expense.wedding_id, expense=expense, direction=Payment.Direction.OUT,
             amount_paise=amount_paise, method=method, reference=reference or "",
-            paid_at=paid_at or timezone.now(), retry_key=idempotency_key or None)
+            paid_at=paid_at or timezone.now(), retry_key=idempotency_key or None,
+            recorded_by_id=getattr(recorded_by, "pk", None))
         recompute_expense(expense)
     return payment, created
+
+
+def undo_payment(payment: Payment, by) -> None:
+    """Removes a payment that was typed in by mistake, and tells the founder who did it.
+
+    Online payments cannot be undone here: the money really moved, so they need a refund in Razorpay.
+    """
+    from live.alerts import notify_roles
+
+    if payment.method == "RAZORPAY":
+        raise Conflict("An online payment cannot be undone here. Refund it in Razorpay instead.")
+    with transaction.atomic():
+        payment = (Payment.objects.select_for_update(of=("self",)).select_related("wedding", "invoice", "expense")
+                   .get(pk=payment.pk))
+        invoice, expense = payment.invoice, payment.expense
+        summary = (f"Payment of Rs {payment.amount_paise // 100:,} ({payment.method.title()}"
+                   f"{', ' + payment.reference if payment.reference else ''}) on {payment.wedding.title} was removed "
+                   f"by {getattr(by, 'name', 'someone')}.")
+        payment.delete()
+        if invoice:
+            recompute_invoice(invoice)
+        if expense:
+            recompute_expense(expense)
+        notify_roles(summary, roles=(), severity="warning")  # founder only
 
 
 # ---------------------------------------------------------------- invoices
@@ -199,8 +226,19 @@ def create_invoice(wedding: Wedding, kind: str, amount_paise: int, due_date=None
         raise ValidationError({"type": [f"Choose one of: {', '.join(Invoice.Kind.values)}."]})
     if amount_paise is None or amount_paise <= 0:
         raise ValidationError({"amount_paise": ["Enter an amount greater than zero."]})
+    if kind == Invoice.Kind.DEPOSIT and Invoice.objects.filter(wedding=wedding, kind=kind).exists():
+        raise Conflict("This wedding already has a booking deposit invoice.")
     return Invoice.objects.create(wedding=wedding, client_id=wedding.client_id, kind=kind,
                                   amount_paise=amount_paise, due_date=due_date, note=note or "")
+
+
+def delete_invoice(invoice: Invoice) -> None:
+    """Removes an invoice made by mistake. Only possible while nothing has been paid on it."""
+    with transaction.atomic():
+        invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if invoice.payments.exists():
+            raise Conflict("This invoice already has payments, so it cannot be deleted.")
+        invoice.delete()  # its payment links go with it
 
 
 def extra_guest_charge(wedding: Wedding, actual_guests: int) -> dict:
@@ -351,7 +389,7 @@ def create_milestones(wedding=None, vendor=None, expense=None, total_paise: int 
 
 
 def pay_milestone(plan_id: int, amount_paise: int | None = None, method: str = "BANK", reference: str = "",
-                  idempotency_key: str | None = None) -> tuple[Payment, bool]:
+                  idempotency_key: str | None = None, recorded_by=None) -> tuple[Payment, bool]:
     """Pays an advance / final instalment (the whole remaining part when no amount is given)."""
     plan = VendorPaymentPlan.objects.select_related("expense").get(pk=plan_id)
     if plan.expense_id is None:
@@ -362,7 +400,7 @@ def pay_milestone(plan_id: int, amount_paise: int | None = None, method: str = "
         if amount_paise <= 0:
             raise Conflict("This instalment is already paid.")
     return record_expense_payment(plan.expense_id, amount_paise, method, reference, idempotency_key=idempotency_key,
-                                  milestone=plan)
+                                  milestone=plan, recorded_by=recorded_by)
 
 
 # ---------------------------------------------------------------- reports

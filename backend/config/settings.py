@@ -113,7 +113,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "common.pagination.StandardPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_THROTTLE_RATES": {"login": "20/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "20/min", "public_pay": "60/min"},
 }
 SPECTACULAR_SETTINGS = {
     "TITLE": "KalyaanaMaalai - Wedding Planning API",
@@ -129,6 +129,8 @@ CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
 
 # --- Outside services. While MOCK_EXTERNALS is true they return fake answers, so the demo never breaks.
 MOCK_EXTERNALS = env("MOCK_EXTERNALS", "true").lower() == "true"
+# the fake payment checkout is dev-only unless this is switched on on purpose (for example for a public demo)
+ALLOW_DEMO_PAYMENTS = env("ALLOW_DEMO_PAYMENTS", "false").lower() == "true"
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 OPENAI_MODEL = env("OPENAI_MODEL")
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID")

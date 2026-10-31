@@ -1,13 +1,17 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from common.pagination import StandardPagination
 from common.permissions import Role, read_for_all_write_for
-from payments import razorpay_client, services
-from payments.models import Expense, Invoice, Payment, VendorPaymentPlan
+from payments import links, razorpay_client, services
+from payments.models import Expense, Invoice, Payment, PaymentLink, VendorPaymentPlan
 from payments.serializers import (
     ExpenseInput,
     ExpensePatch,
@@ -15,12 +19,18 @@ from payments.serializers import (
     ExtraGuestsInput,
     InvoiceInput,
     InvoicePatch,
+    InvoiceRowSerializer,
     InvoiceSerializer,
+    LedgerSerializer,
     MilestonePayInput,
     MilestoneSerializer,
     PaymentInput,
+    PaymentLinkInput,
+    PaymentLinkSerializer,
     PaymentSerializer,
+    PublicOrderResult,
     RazorpayVerifyInput,
+    VendorBillSerializer,
     with_paid,
 )
 from weddings.models import Wedding
@@ -132,6 +142,11 @@ class InvoiceDetail(FinanceView):
         services.update_invoice(invoice, data.validated_data)
         return Response(InvoiceSerializer(_invoice(pk)).data)
 
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk):
+        services.delete_invoice(get_object_or_404(Invoice, pk=pk))
+        return Response(status=204)
+
 
 class InvoicePayments(FinanceView):
     @extend_schema(responses=PaymentSerializer(many=True))
@@ -147,7 +162,8 @@ class InvoicePayments(FinanceView):
         data.is_valid(raise_exception=True)
         v = data.validated_data
         payment, created = services.record_invoice_payment(
-            pk, v["amount_paise"], v["method"], v.get("reference", ""), v.get("paid_at"), _key(request))
+            pk, v["amount_paise"], v["method"], v.get("reference", ""), v.get("paid_at"), _key(request),
+            recorded_by=request.user)
         return _payment_response(payment, created)
 
 
@@ -182,7 +198,8 @@ class ExpensePayments(FinanceView):
         data.is_valid(raise_exception=True)
         v = data.validated_data
         payment, created = services.record_expense_payment(
-            pk, v["amount_paise"], v["method"], v.get("reference", ""), v.get("paid_at"), _key(request))
+            pk, v["amount_paise"], v["method"], v.get("reference", ""), v.get("paid_at"), _key(request),
+            recorded_by=request.user)
         return _payment_response(payment, created)
 
 
@@ -196,7 +213,7 @@ class MilestonePay(FinanceView):
         data.is_valid(raise_exception=True)
         v = data.validated_data
         payment, created = services.pay_milestone(pk, v.get("amount_paise"), v["method"], v.get("reference", ""),
-                                                  _key(request))
+                                                  _key(request), recorded_by=request.user)
         return _payment_response(payment, created)
 
 
@@ -261,3 +278,126 @@ class RazorpayVerify(FinanceView):
                 invoice.pk, order["amount"], "RAZORPAY", v["razorpay_payment_id"],
                 idempotency_key=f"razorpay:{v['razorpay_payment_id']}")
         return _payment_response(payment, created)
+
+
+# ---------------------------------------------------------------- lists for the Payments page
+
+class AllInvoices(FinanceView):
+    """Customer invoices across weddings. ?wedding=<id>  ?status=open|unpaid|partial|paid|overdue"""
+
+    @extend_schema(responses=InvoiceRowSerializer(many=True))
+    def get(self, request):
+        queryset = with_paid(Invoice.objects.select_related("wedding", "client").prefetch_related("links"))
+        params = request.query_params
+        if params.get("wedding"):
+            queryset = queryset.filter(wedding_id=params["wedding"])
+        wanted = params.get("status", "")
+        if wanted == "open":
+            queryset = queryset.exclude(status="PAID")
+        elif wanted == "overdue":
+            queryset = queryset.exclude(status="PAID").filter(due_date__lt=timezone.localdate())
+        elif wanted in ("unpaid", "partial", "paid"):
+            queryset = queryset.filter(status=wanted.upper())
+        return Response(InvoiceRowSerializer(queryset.order_by("due_date", "id"), many=True).data)
+
+
+class VendorBills(FinanceView):
+    """What we owe vendors, each bill with its instalments. ?wedding=<id>"""
+
+    @extend_schema(responses=VendorBillSerializer(many=True))
+    def get(self, request):
+        queryset = with_paid(Expense.objects.select_related("vendor", "wedding").prefetch_related("vendorpaymentplan_set"))
+        if request.query_params.get("wedding"):
+            queryset = queryset.filter(wedding_id=request.query_params["wedding"])
+        return Response(VendorBillSerializer(queryset.order_by("due_date", "id"), many=True).data)
+
+
+class PaymentLedger(FinanceView):
+    """Every payment, newest first. ?wedding=<id>  ?direction=IN|OUT"""
+
+    @extend_schema(responses=LedgerSerializer(many=True))
+    def get(self, request):
+        queryset = Payment.objects.select_related("wedding", "invoice__client", "expense__vendor", "recorded_by",
+                                                  "payment_link").order_by("-paid_at", "-id")
+        params = request.query_params
+        if params.get("wedding"):
+            queryset = queryset.filter(wedding_id=params["wedding"])
+        if params.get("direction") in ("IN", "OUT"):
+            queryset = queryset.filter(direction=params["direction"])
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        return paginator.get_paginated_response(LedgerSerializer(page, many=True).data)
+
+
+class PaymentDetail(FinanceView):
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk):
+        """Undo a payment typed in by mistake (the founder is told)."""
+        services.undo_payment(get_object_or_404(Payment, pk=pk), request.user)
+        return Response(status=204)
+
+
+# ---------------------------------------------------------------- payment links (staff side)
+
+class InvoiceLinks(FinanceView):
+    @extend_schema(responses=PaymentLinkSerializer(many=True))
+    def get(self, request, pk):
+        invoice = get_object_or_404(Invoice, pk=pk)
+        return Response(PaymentLinkSerializer(invoice.links.all(), many=True).data)
+
+    @extend_schema(request=PaymentLinkInput, responses=PaymentLinkSerializer)
+    def post(self, request, pk):
+        invoice = get_object_or_404(Invoice.objects.select_related("client", "wedding"), pk=pk)
+        data = PaymentLinkInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        link = links.create_link(invoice, data.validated_data.get("amount_paise"), request.user,
+                                 data.validated_data["days"])
+        return Response(PaymentLinkSerializer(link).data, status=201)
+
+
+class LinkCancel(FinanceView):
+    @extend_schema(request=Serializer, responses=PaymentLinkSerializer)
+    def post(self, request, pk):
+        return Response(PaymentLinkSerializer(links.cancel_link(get_object_or_404(PaymentLink, pk=pk))).data)
+
+
+# ---------------------------------------------------------------- payment links (the customer's side, no login)
+
+class PublicView(APIView):
+    """No login: the long random token in the address is the only key. Rate limited, and shows nothing else."""
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "public_pay"
+
+    def link(self, token):
+        return get_object_or_404(PaymentLink.objects.select_related("invoice__wedding", "invoice__client", "payment"),
+                                 token=token)
+
+
+class PublicLinkDetails(PublicView):
+    @extend_schema(responses=dict)
+    def get(self, request, token):
+        response = Response(links.public_details(self.link(token)))
+        response["Cache-Control"] = "no-store"
+        response["X-Robots-Tag"] = "noindex"
+        return response
+
+
+class PublicLinkOrder(PublicView):
+    @extend_schema(request=Serializer, responses=PublicOrderResult)
+    def post(self, request, token):
+        return Response(links.start_payment(self.link(token)))
+
+
+class PublicLinkVerify(PublicView):
+    @extend_schema(request=RazorpayVerifyInput, responses=dict)
+    def post(self, request, token):
+        link = self.link(token)
+        data = RazorpayVerifyInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        v = data.validated_data
+        links.complete_payment(link, v["razorpay_order_id"], v["razorpay_payment_id"], v["razorpay_signature"])
+        link.refresh_from_db()
+        return Response(links.public_details(self.link(token)))
