@@ -17,9 +17,10 @@ class EnquirySerializer(serializers.ModelSerializer):
             "id", "couple_name", "phone", "email", "source", "status", "wedding_date", "guest_count",
             "budget_paise", "venue_city", "consultation_at", "notes", "expected_revenue_paise", "win_chance",
             "priority", "expected_close_date", "lost_reason", "next_follow_up", "client", "client_name",
-            "owner", "owner_name", "created_at",
+            "owner", "owner_name", "partner_name", "functions_wanted", "services_needed",
+            "preferred_contact", "profile_complete", "created_at",
         ]
-        read_only_fields = ["id", "client", "created_at"]  # the client is set by "convert"
+        read_only_fields = ["id", "client", "profile_complete", "created_at"]  # the client is set by "convert"
 
     def get_next_follow_up(self, enquiry):
         """Due time of the earliest follow-up that is not done yet (None if there is none)."""

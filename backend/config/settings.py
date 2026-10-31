@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "dashboard",
     "incidents",
     "live",
+    "portal",
 ]
 
 MIDDLEWARE = [
@@ -113,7 +114,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "common.pagination.StandardPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_THROTTLE_RATES": {"login": "20/min", "public_pay": "60/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "20/min", "public_pay": "60/min", "portal_auth": "20/min"},
 }
 SPECTACULAR_SETTINGS = {
     "TITLE": "KalyaanaMaalai - Wedding Planning API",
@@ -123,9 +124,10 @@ SPECTACULAR_SETTINGS = {
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("LOGIN_MINUTES", "720")))}
 
 FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173")
-CORS_ALLOWED_ORIGINS = [FRONTEND_URL, "http://localhost:5173"]
+CUSTOMER_SITE_URL = env("CUSTOMER_SITE_URL", "http://localhost:5174")  # the couples' website
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL, "http://localhost:5173", CUSTOMER_SITE_URL]
 CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key", "last-event-id"]  # lets the website retry a payment safely
-CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
+CSRF_TRUSTED_ORIGINS = [FRONTEND_URL, CUSTOMER_SITE_URL]
 
 # --- Outside services. While MOCK_EXTERNALS is true they return fake answers, so the demo never breaks.
 # tests always use the fake answers, whatever .env says, so they never reach a real service or spend real money

@@ -18,6 +18,11 @@ def convert_to_client(enquiry: Enquiry, create_wedding: bool = False, title: str
             couple_name=enquiry.couple_name, phone=enquiry.phone, email=enquiry.email,
             city=enquiry.venue_city,
         )
+    # a couple who signed up on the customer website can now see their invoices there
+    customer = getattr(enquiry, "portal_customer", None)
+    if customer is not None and customer.client_id is None:
+        customer.client = enquiry.client
+        customer.save(update_fields=["client"])
     enquiry.status = Status.WON
     enquiry.win_chance = 100
     enquiry.lost_reason = ""
