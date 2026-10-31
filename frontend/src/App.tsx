@@ -9,6 +9,8 @@ import LoginPage from '@/pages/login/LoginPage'
 import NotificationsPage from '@/pages/notifications/NotificationsPage'
 import PaymentsPage from '@/pages/payments/PaymentsPage'
 import QuotationsPage from '@/pages/quotations/QuotationsPage'
+import RequestDetailPage from '@/pages/quotations/RequestDetailPage'
+import VendorProfilePage from '@/pages/vendors/VendorProfilePage'
 import VendorsPage from '@/pages/vendors/VendorsPage'
 import WeddingsPage from '@/pages/weddings/WeddingsPage'
 
@@ -26,7 +28,9 @@ export default function App() {
             <Route path="clients/:id" element={<ClientPage />} />
             <Route path="weddings" element={<WeddingsPage />} />
             <Route path="vendors" element={<VendorsPage />} />
+            <Route path="vendors/:id" element={<VendorProfilePage />} />
             <Route path="quotations" element={<QuotationsPage />} />
+            <Route path="quotations/:id" element={<RequestDetailPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
           </Route>
