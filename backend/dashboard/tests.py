@@ -71,3 +71,16 @@ class DashboardTests(APITestCase):
         self.assertEqual(self.client.get("/api/dashboard/summary/").status_code, 403)
         self.client.force_authenticate(None)
         self.assertEqual(self.client.get("/api/dashboard/summary/").status_code, 401)
+
+
+class ActivityFeedTests(APITestCase):
+    def test_an_alert_saved_for_several_people_is_listed_once(self):
+        from notifications.models import Notification
+
+        founder = User.objects.create_user("f2@t.com", "Founder", "Password123", role=Role.FOUNDER)
+        planner = User.objects.create_user("p2@t.com", "Planner", "Password123", role=Role.PLANNER)
+        for user in (founder, planner):
+            Notification.objects.create(user=user, message="Incident at Jaipur: DJ has not arrived")
+        self.client.force_authenticate(founder)
+        feed = self.client.get("/api/dashboard/summary/").data["recent_activity"]
+        self.assertEqual([item["text"] for item in feed].count("Incident at Jaipur: DJ has not arrived"), 1)

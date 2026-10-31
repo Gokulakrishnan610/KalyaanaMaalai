@@ -6,6 +6,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from enquiries.models import STAGE_WIN_CHANCE, Enquiry, FollowUp, Status
+from incidents.models import Incident, IncidentStatus, Severity
 from notifications.models import Notification
 from payments.models import Expense, Invoice, Payment, PayStatus
 from tasks.models import Stage, Task
@@ -89,8 +90,12 @@ def recent_activity(limit=8):
     for a in arrivals.order_by("-arrived_at")[:limit]:
         events.append({"kind": "vendor", "text": f"{a.vendor.name} arrived ({a.get_status_display().lower()}) at {a.wedding.title}",
                        "at": a.arrived_at})
-    for n in Notification.objects.order_by("-created_at")[:limit]:
-        events.append({"kind": "alert", "text": n.message, "at": n.created_at})
+    seen_alerts = set()
+    # an alert for several people is saved once per person, so show each message only once
+    for n in Notification.objects.order_by("-created_at")[: limit * 4]:
+        if n.message not in seen_alerts:
+            seen_alerts.add(n.message)
+            events.append({"kind": "alert", "text": n.message, "at": n.created_at})
     return sorted(events, key=lambda event: event["at"], reverse=True)[:limit]
 
 
@@ -104,6 +109,21 @@ def follow_up_summary(now):
             {"id": f.id, "enquiry_id": f.enquiry_id, "couple_name": f.enquiry.couple_name, "kind": f.kind,
              "summary": f.summary, "due_at": f.due_at, "overdue": f.due_at < now}
             for f in upcoming
+        ],
+    }
+
+
+def incident_summary():
+    """Problems reported during weddings that nobody has resolved yet."""
+    unresolved = Incident.objects.exclude(status=IncidentStatus.RESOLVED).select_related("wedding", "assigned_to")
+    return {
+        "open_incidents": unresolved.count(),
+        "critical_incidents": unresolved.filter(severity__in=[Severity.HIGH, Severity.CRITICAL]).count(),
+        "recent_incidents": [
+            {"id": i.id, "title": i.title, "wedding_title": i.wedding.title, "severity": i.severity,
+             "status": i.status, "assigned_to_name": i.assigned_to.name if i.assigned_to else "",
+             "created_at": i.created_at}
+            for i in unresolved.order_by("-created_at")[:5]
         ],
     }
 
@@ -143,6 +163,7 @@ def build_summary():
         ],
         **follow_up_summary(now),
         **pipeline_value(),
+        **incident_summary(),
         "total_weddings": len(rows),
         "ongoing_weddings": Wedding.objects.exclude(
             status__in=[WeddingStatus.COMPLETED, WeddingStatus.CANCELLED]).count(),
