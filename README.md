@@ -104,6 +104,7 @@ backend/
   vendors/          caterers, decorators, DJs and their details
   quotations/       asking vendors for prices, comparing, picking the winner
   payments/         invoices, payment links, vendor bills, payment history
+  portal/           couples' accounts for the customer website (own login, own token)
   ai_tools/         reading quotation PDFs and writing checklists with AI
   notifications/    alerts (bell icon, Telegram)
   incidents/        problems reported during weddings: assign, track, resolve
@@ -125,7 +126,23 @@ frontend/src/
   types/            API types, made automatically from the backend
 ```
 
+customer-site/      the couples' website (separate project, port 5174)
+  src/pages/        landing (photo slider), sign up / log in, the 4-step profile, home, pay
+  public/photos/    put your own photos here: hero-1..4.jpg and gallery-1..5.jpg
+
 Every backend folder follows the same pattern: `models.py` (the data), `serializers.py` (what the API sends and accepts), `views.py` (the logic), `urls.py` (the web addresses), `admin.py` (the admin pages), `tests.py`.
+
+## The customer website
+
+A separate site for the couples, in `customer-site/`. It talks to the same backend under `/api/portal/`.
+
+```bash
+cd customer-site && npm install && npm run dev    # http://localhost:5174
+```
+
+How it joins the CRM: a couple signs up, which creates an enquiry (source "Website") and alerts the planners. They then fill a 4-step profile (partner, date, city, guests, services, functions, budget, how to contact them). The answers land in the same enquiry and show in a "From the customer website" box in the staff form. When the planner converts the enquiry to a client, the couple's account is linked to it, and the invoices appear on the website with a Pay button. Pay opens the same payment-link page as the WhatsApp link, so there are three ways to pay: a link sent by WhatsApp, a payment typed in by the team, and paying inside the website.
+
+Customer logins are a different kind of token from staff logins, so one can never be used on the other's pages. Set `CUSTOMER_SITE_URL` in `backend/.env` if the site is not on port 5174, and `VITE_WHATSAPP` in `customer-site/.env` for the WhatsApp button.
 
 ## Live updates (no refreshing)
 
