@@ -7,11 +7,14 @@ import { LinkButton } from '@/components/ui'
 import { FAQ, SERVICES, STEPS } from '@/data/content'
 
 const GALLERY = [
-  { src: '/photos/gallery-1.jpg', caption: 'Mehendi evening', className: 'aspect-[4/3]' },
-  { src: '/photos/gallery-2.jpg', caption: 'The mandap', className: 'aspect-[4/3]' },
-  { src: '/photos/gallery-3.jpg', caption: 'Sangeet night', className: 'aspect-[4/3]' },
-  { src: '/photos/gallery-4.jpg', caption: 'Wedding table', className: 'aspect-[4/3]' },
-  { src: '/photos/gallery-5.jpg', caption: 'Reception', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-1.jpg', caption: 'Rings and roses', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-2.jpg', caption: 'The wedding table', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-3.jpg', caption: 'The bouquet', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-4.jpg', caption: 'Mr & Mrs', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-5.jpg', caption: 'Garden seating', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-6.jpg', caption: 'Wedding day', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-7.jpg', caption: 'Evening walk', className: 'aspect-[4/3]' },
+  { src: '/photos/gallery-8.jpg', caption: 'Bridal portrait', className: 'aspect-[4/3]' },
 ]
 
 const WHY = [

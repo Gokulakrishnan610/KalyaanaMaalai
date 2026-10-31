@@ -128,7 +128,7 @@ frontend/src/
 
 customer-site/      the couples' website (separate project, port 5174)
   src/pages/        landing (photo slider), sign up / log in, the 4-step profile, home, pay
-  public/photos/    put your own photos here: hero-1..4.jpg and gallery-1..5.jpg
+  public/photos/    put your own photos here: hero-1..4.jpg and gallery-1..8.jpg (free Unsplash stock photos for now)
 
 Every backend folder follows the same pattern: `models.py` (the data), `serializers.py` (what the API sends and accepts), `views.py` (the logic), `urls.py` (the web addresses), `admin.py` (the admin pages), `tests.py`.
 
