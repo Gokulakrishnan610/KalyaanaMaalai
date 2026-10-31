@@ -5,7 +5,7 @@ from django.db.models import Count, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from enquiries.models import Enquiry, Status
+from enquiries.models import STAGE_WIN_CHANCE, Enquiry, FollowUp, Status
 from notifications.models import Notification
 from payments.models import Expense, Invoice, Payment, PayStatus
 from tasks.models import Stage, Task
@@ -94,6 +94,27 @@ def recent_activity(limit=8):
     return sorted(events, key=lambda event: event["at"], reverse=True)[:limit]
 
 
+def follow_up_summary(now):
+    """Open follow-ups: how many are late and the next few coming up."""
+    open_ones = FollowUp.objects.filter(done_at__isnull=True).select_related("enquiry")
+    upcoming = open_ones.order_by("due_at")[:6]
+    return {
+        "overdue_follow_ups": open_ones.filter(due_at__lt=now).count(),
+        "upcoming_follow_ups": [
+            {"id": f.id, "enquiry_id": f.enquiry_id, "couple_name": f.enquiry.couple_name, "kind": f.kind,
+             "summary": f.summary, "due_at": f.due_at, "overdue": f.due_at < now}
+            for f in upcoming
+        ],
+    }
+
+
+def pipeline_value():
+    """What we expect to earn from open enquiries, weighted by the chance of winning them."""
+    open_enquiries = Enquiry.objects.exclude(status__in=[Status.WON, Status.LOST])
+    total = sum((e.expected_revenue_paise or 0) * e.win_chance // 100 for e in open_enquiries)
+    return {"pipeline_expected_paise": total, "stage_win_chances": {k.value: v for k, v in STAGE_WIN_CHANCE.items()}}
+
+
 def build_summary():
     now = timezone.now()
     today = timezone.localdate()
@@ -120,6 +141,8 @@ def build_summary():
             {"id": r["wedding_id"], "title": r["title"], "date": r["date"]}
             for r in sorted((r for r in rows if r["date"] >= today), key=lambda r: r["date"])[:5]
         ],
+        **follow_up_summary(now),
+        **pipeline_value(),
         "total_weddings": len(rows),
         "ongoing_weddings": Wedding.objects.exclude(
             status__in=[WeddingStatus.COMPLETED, WeddingStatus.CANCELLED]).count(),

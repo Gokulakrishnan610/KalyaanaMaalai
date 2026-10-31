@@ -4,11 +4,12 @@ import { useDeferredValue, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Badge, Button, cn, EmptyState, ErrorState, Select, Spinner, Table, Td, Th } from '@/components/common'
 import { get, patch, type Page } from '@/api/client'
-import { formatDate } from '@/helpers/date'
+import { formatDate, formatDateTime } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
 import { EnquiryBoard } from './EnquiryBoard'
 import { EnquiryForm } from './EnquiryForm'
+import { StarRating } from './StarRating'
 import { SOURCES, sourceInfo, STATUSES, statusInfo, type Enquiry, type Status } from './types'
 
 type View = 'table' | 'board'
@@ -146,7 +147,8 @@ export default function EnquiriesPage() {
           enquiries={shown}
           canEdit={canEdit}
           onOpen={setOpen}
-          onMove={(enquiry, status) => move.mutate({ enquiry, status })}
+          // losing an enquiry needs a reason, so open the form with the Lost stage chosen
+          onMove={(enquiry, status) => (status === 'LOST' ? setOpen({ ...enquiry, status, win_chance: 0 }) : move.mutate({ enquiry, status }))}
         />
       )}
 
@@ -156,9 +158,9 @@ export default function EnquiriesPage() {
             <tr>
               <Th>Couple</Th>
               <Th>Wedding date</Th>
-              <Th>City</Th>
-              <Th>Guests</Th>
               <Th>Budget</Th>
+              <Th>Win chance</Th>
+              <Th>Next follow-up</Th>
               <Th>Source</Th>
               <Th>Status</Th>
               <Th>Assigned to</Th>
@@ -170,12 +172,29 @@ export default function EnquiriesPage() {
               <tr key={e.id} className="cursor-pointer hover:bg-slate-50/70" onClick={() => setOpen(e)}>
                 <Td>
                   <div className="font-medium">{e.couple_name}</div>
-                  <div className="text-xs text-slate-500">{e.phone}</div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    {e.phone} <StarRating value={e.priority} />
+                  </div>
                 </Td>
                 <Td>{formatDate(e.wedding_date)}</Td>
-                <Td>{e.venue_city || '-'}</Td>
-                <Td>{e.guest_count ?? '-'}</Td>
                 <Td>{e.budget_paise ? formatINR(e.budget_paise) : '-'}</Td>
+                <Td>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-brand-500" style={{ width: `${e.win_chance}%` }} />
+                    </div>
+                    <span className="text-xs text-slate-600">{e.win_chance}%</span>
+                  </div>
+                </Td>
+                <Td>
+                  {e.next_follow_up ? (
+                    <span className={new Date(e.next_follow_up) < new Date() ? 'font-medium text-red-600' : ''}>
+                      {formatDateTime(e.next_follow_up)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">-</span>
+                  )}
+                </Td>
                 <Td>
                   {sourceInfo(e.source).icon} {sourceInfo(e.source).label}
                 </Td>

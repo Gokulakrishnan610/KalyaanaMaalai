@@ -1,4 +1,5 @@
 export type Source = 'CALL' | 'INSTAGRAM' | 'WHATSAPP' | 'REFERRAL' | 'WEBSITE'
+export type LostReason = 'BUDGET' | 'COMPETITOR' | 'DATE' | 'NO_RESPONSE' | 'OTHER'
 export type Status = 'NEW' | 'CONTACTED' | 'CONSULTATION' | 'PROPOSAL' | 'WON' | 'LOST'
 
 export interface Enquiry {
@@ -14,6 +15,12 @@ export interface Enquiry {
   venue_city: string
   consultation_at: string | null
   notes: string
+  expected_revenue_paise: number | null
+  win_chance: number
+  priority: number
+  expected_close_date: string | null
+  lost_reason: LostReason | ''
+  next_follow_up: string | null
   client: number | null
   client_name: string | null
   owner: number | null
@@ -40,3 +47,40 @@ export const STATUSES: { value: Status; label: string; tone: 'gray' | 'blue' | '
 
 export const sourceInfo = (source: Source) => SOURCES.find((s) => s.value === source)!
 export const statusInfo = (status: Status) => STATUSES.find((s) => s.value === status)!
+
+export const LOST_REASONS: { value: LostReason; label: string }[] = [
+  { value: 'BUDGET', label: 'Budget too low' },
+  { value: 'COMPETITOR', label: 'Chose another planner' },
+  { value: 'DATE', label: 'Date not available' },
+  { value: 'NO_RESPONSE', label: 'No response' },
+  { value: 'OTHER', label: 'Other' },
+]
+
+/** How likely a couple is to book at each stage (same numbers as the backend). */
+export const STAGE_WIN_CHANCE: Record<Status, number> = {
+  NEW: 10,
+  CONTACTED: 20,
+  CONSULTATION: 40,
+  PROPOSAL: 60,
+  WON: 100,
+  LOST: 0,
+}
+
+export interface FollowUp {
+  id: number
+  enquiry: number
+  enquiry_name: string
+  kind: 'CALL' | 'MEETING' | 'WHATSAPP' | 'EMAIL' | 'TODO'
+  summary: string
+  due_at: string
+  done_at: string | null
+  is_overdue: boolean
+}
+
+export const FOLLOW_UP_KINDS: { value: FollowUp['kind']; label: string; icon: string }[] = [
+  { value: 'CALL', label: 'Call', icon: '📞' },
+  { value: 'MEETING', label: 'Meeting', icon: '🤝' },
+  { value: 'WHATSAPP', label: 'WhatsApp', icon: '💬' },
+  { value: 'EMAIL', label: 'Email', icon: '✉️' },
+  { value: 'TODO', label: 'To do', icon: '✅' },
+]

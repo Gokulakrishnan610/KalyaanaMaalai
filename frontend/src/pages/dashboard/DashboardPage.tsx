@@ -31,6 +31,9 @@ import { sourceInfo, type Source } from '@/pages/enquiries/types'
 
 interface Summary {
   active_enquiries: number
+  overdue_follow_ups: number
+  pipeline_expected_paise: number
+  upcoming_follow_ups: { id: number; enquiry_id: number; couple_name: string; kind: string; summary: string; due_at: string; overdue: boolean }[]
   enquiries_by_source: { source: Source; count: number }[]
   conversion_rate: number
   total_weddings: number
@@ -251,20 +254,29 @@ export default function DashboardPage() {
             </div>
           )}
           <p className="mt-2 text-xs text-slate-500">
-            {data.active_enquiries} open enquiries · {data.conversion_rate}% became clients
+            {data.active_enquiries} open enquiries · {data.conversion_rate}% became clients · expected pipeline{' '}
+            {formatINR(data.pipeline_expected_paise)}
           </p>
         </Card>
 
         <Card>
-          <CardTitle className="text-base">Upcoming consultations</CardTitle>
-          {data.upcoming_consultations.length === 0 ? (
-            <p className="text-sm text-slate-500">None booked.</p>
+          <div className="mb-3 flex items-center justify-between">
+            <CardTitle className="mb-0 text-base">Follow-ups</CardTitle>
+            {data.overdue_follow_ups > 0 && <Badge tone="red">{data.overdue_follow_ups} overdue</Badge>}
+          </div>
+          {data.upcoming_follow_ups.length === 0 ? (
+            <p className="text-sm text-slate-500">Nothing planned. Add follow-ups on an enquiry.</p>
           ) : (
             <ul className="space-y-3 text-sm">
-              {data.upcoming_consultations.map((c) => (
-                <li key={c.id} className="flex justify-between gap-2">
-                  <span className="font-medium">{c.couple_name}</span>
-                  <span className="text-slate-500">{formatDateTime(c.consultation_at)}</span>
+              {data.upcoming_follow_ups.map((f) => (
+                <li key={f.id}>
+                  <div className="flex justify-between gap-2">
+                    <Link to={`/enquiries?q=${encodeURIComponent(f.couple_name)}`} className="font-medium hover:text-brand-600">
+                      {f.couple_name}
+                    </Link>
+                    <span className={f.overdue ? 'font-medium text-red-600' : 'text-slate-500'}>{formatDateTime(f.due_at)}</span>
+                  </div>
+                  <div className="text-xs text-slate-500">{f.summary}</div>
                 </li>
               ))}
             </ul>
@@ -272,7 +284,23 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      <div className="grid gap-6 xl:grid-cols-3">
       <Card>
+        <CardTitle className="text-base">Upcoming consultations</CardTitle>
+        {data.upcoming_consultations.length === 0 ? (
+          <p className="text-sm text-slate-500">None booked.</p>
+        ) : (
+          <ul className="space-y-3 text-sm">
+            {data.upcoming_consultations.map((c) => (
+              <li key={c.id} className="flex justify-between gap-2">
+                <span className="font-medium">{c.couple_name}</span>
+                <span className="text-slate-500">{formatDateTime(c.consultation_at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card className="xl:col-span-2">
         <CardTitle className="text-base">Vendor payments due this week</CardTitle>
         {data.upcoming_vendor_payments.length === 0 ? (
           <p className="text-sm text-slate-500">Nothing due in the next 7 days.</p>
@@ -293,6 +321,7 @@ export default function DashboardPage() {
           </ul>
         )}
       </Card>
+      </div>
     </div>
   )
 }

@@ -9,7 +9,9 @@ import { ApiError, patch, post, remove } from '@/api/client'
 import { fromLocalInput, toLocalInput } from '@/helpers/date'
 import { paiseToRupees, rupeesToPaise } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
-import { SOURCES, STATUSES, type Enquiry } from './types'
+import { FollowUps } from './FollowUps'
+import { StarRating } from './StarRating'
+import { LOST_REASONS, SOURCES, STAGE_WIN_CHANCE, STATUSES, type Enquiry, type Status } from './types'
 
 const schema = z.object({
   couple_name: z.string().min(1, 'Enter the couple’s name'),
@@ -23,6 +25,11 @@ const schema = z.object({
   venue_city: z.string(),
   consultation_at: z.string(),
   notes: z.string(),
+  expected_fee: z.string().refine((v) => v === '' || Number(v.replace(/,/g, '')) >= 0, 'Enter a valid amount'),
+  win_chance: z.string().refine((v) => v !== '' && Number(v) >= 0 && Number(v) <= 100, 'Enter 0 to 100'),
+  priority: z.string(),
+  expected_close_date: z.string(),
+  lost_reason: z.string(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -45,6 +52,7 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
     handleSubmit,
     setError,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -60,6 +68,11 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
       venue_city: enquiry?.venue_city ?? '',
       consultation_at: toLocalInput(enquiry?.consultation_at),
       notes: enquiry?.notes ?? '',
+      expected_fee: enquiry?.expected_revenue_paise ? String(paiseToRupees(enquiry.expected_revenue_paise)) : '',
+      win_chance: String(enquiry?.win_chance ?? STAGE_WIN_CHANCE.NEW),
+      priority: String(enquiry?.priority ?? 0),
+      expected_close_date: enquiry?.expected_close_date ?? '',
+      lost_reason: enquiry?.lost_reason ?? '',
     },
   })
 
@@ -79,6 +92,11 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
         venue_city: v.venue_city,
         consultation_at: fromLocalInput(v.consultation_at),
         notes: v.notes,
+        expected_revenue_paise: v.expected_fee ? rupeesToPaise(v.expected_fee) : null,
+        win_chance: Number(v.win_chance),
+        priority: Number(v.priority),
+        expected_close_date: v.expected_close_date || null,
+        lost_reason: v.status === 'LOST' ? v.lost_reason : '',
       }
       return enquiry ? patch<Enquiry>(`/enquiries/${enquiry.id}/`, body) : post<Enquiry>('/enquiries/', body)
     },
@@ -89,7 +107,7 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
     onError: (e) => {
       if (!(e instanceof ApiError)) return setMessage('Could not reach the server')
       setMessage(e.message)
-      const names: Record<string, keyof FormValues> = { budget_paise: 'budget' }
+      const names: Record<string, keyof FormValues> = { budget_paise: 'budget', expected_revenue_paise: 'expected_fee' }
       for (const [field, text] of Object.entries(e.fields)) {
         const name = names[field] ?? (field as keyof FormValues)
         if (name in schema.shape) setError(name, { message: text })
@@ -106,6 +124,7 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
       refresh()
       setConvertedTo(res.client.id)
       setValue('status', 'WON') // keep the form in step, so Save does not undo the conversion
+      setValue('win_chance', '100')
       setMessage(res.wedding_id ? 'Client and wedding created.' : 'Client created.')
     },
     onError: (e) => setMessage(e instanceof ApiError ? e.message : 'Could not reach the server'),
@@ -139,10 +158,33 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
           <Input label="City" {...register('venue_city')} />
           <Input label="First consultation meeting" type="datetime-local" {...register('consultation_at')} />
           {enquiry && (
-            <Select label="Stage" {...register('status')}>
+            <Select
+              label="Stage"
+              {...register('status', {
+                // a new stage brings its usual win chance, which can still be edited by hand
+                onChange: (e) => setValue('win_chance', String(STAGE_WIN_CHANCE[e.target.value as Status])),
+              })}
+            >
               {STATUSES.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
+                </option>
+              ))}
+            </Select>
+          )}
+          <Input label="Expected fee for us (₹)" inputMode="decimal" error={errors.expected_fee?.message} {...register('expected_fee')} />
+          <Input label="Chance of winning (%)" type="number" min={0} max={100} error={errors.win_chance?.message} {...register('win_chance')} />
+          <Input label="Expected decision date" type="date" {...register('expected_close_date')} />
+          <div className="text-sm">
+            <span className="mb-1 block font-medium text-slate-700">Priority</span>
+            <StarRating value={Number(watch('priority'))} onChange={canEdit ? (n) => setValue('priority', String(n)) : undefined} />
+          </div>
+          {watch('status') === 'LOST' && (
+            <Select label="Why was it lost?" error={errors.lost_reason?.message} {...register('lost_reason')}>
+              <option value="">Choose a reason…</option>
+              {LOST_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
                 </option>
               ))}
             </Select>
@@ -162,6 +204,8 @@ export function EnquiryForm({ enquiry, onClose }: Props) {
             {message}
           </p>
         )}
+
+        {enquiry && <FollowUps enquiryId={enquiry.id} canEdit={canEdit} />}
 
         {enquiry && (
           <div className="rounded-lg border border-slate-200 p-3 text-sm">

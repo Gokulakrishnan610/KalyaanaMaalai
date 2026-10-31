@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import Role, User
 from clients.models import Client
+from enquiries.models import Enquiry, FollowUp
 from payments.models import Expense, Invoice, Payment
 from tasks.models import Task
 from weddings.models import Wedding
@@ -46,6 +47,17 @@ class DashboardTests(APITestCase):
         self.assertEqual((data["total_weddings"], data["ongoing_weddings"]), (1, 1))
         self.assertEqual((data["open_tasks"], data["overdue_tasks"]), (1, 0))
         self.assertTrue(any(item["kind"] == "payment" for item in data["recent_activity"]))
+
+    def test_follow_ups_and_pipeline_value(self):
+        enquiry = Enquiry.objects.create(couple_name="Kabir & Sana", phone="9898989898", source="CALL",
+                                         expected_revenue_paise=1000_00, win_chance=40)
+        FollowUp.objects.create(enquiry=enquiry, summary="Call back", due_at=timezone.now() - timedelta(days=1))
+        FollowUp.objects.create(enquiry=enquiry, summary="Send quote", due_at=timezone.now() + timedelta(days=1))
+        self.client.force_authenticate(self.founder)
+        data = self.client.get("/api/dashboard/summary/").data
+        self.assertEqual(data["overdue_follow_ups"], 1)
+        self.assertEqual(len(data["upcoming_follow_ups"]), 2)
+        self.assertEqual(data["pipeline_expected_paise"], 400_00)
 
     def test_upcoming_vendor_payment_shows_only_what_is_still_owed(self):
         self.client.force_authenticate(self.founder)

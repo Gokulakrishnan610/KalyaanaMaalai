@@ -9,6 +9,7 @@ import {
 } from '@dnd-kit/core'
 import { cn } from '@/components/common'
 import { formatINR } from '@/helpers/money'
+import { StarRating } from './StarRating'
 import { sourceInfo, STATUSES, type Enquiry, type Status } from './types'
 
 interface Props {
@@ -43,7 +44,16 @@ function Card({ enquiry, canEdit, onOpen }: { enquiry: Enquiry; canEdit: boolean
         </span>
         {enquiry.guest_count && <span>{enquiry.guest_count} guests</span>}
       </div>
-      {enquiry.budget_paise ? <div className="mt-1 text-xs text-slate-600">{formatINR(enquiry.budget_paise)}</div> : null}
+      <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
+        <span>{enquiry.budget_paise ? formatINR(enquiry.budget_paise) : ''}</span>
+        <span className="font-medium">{enquiry.win_chance}%</span>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between">
+        <StarRating value={enquiry.priority} />
+        {enquiry.next_follow_up && new Date(enquiry.next_follow_up) < new Date() && (
+          <span className="text-[11px] font-medium text-red-600">Follow-up overdue</span>
+        )}
+      </div>
     </div>
   )
 }

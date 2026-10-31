@@ -83,6 +83,8 @@ When you change a model: `cd backend && .venv/bin/python manage.py makemigration
 
 - **Login** for founder, planner and staff, with role checks (staff can look but not change; only the founder deletes).
 - **Enquiries:** board (drag a card to change its stage) and table, filter by source, search, add/edit form, first-consultation date, and **Convert to client** (optionally also starting the wedding project). Converting twice never creates a second client.
+- **Odoo-style CRM fields:** each enquiry has an expected fee, chance of winning (starts from the stage: New 10%, Contacted 20%, Consultation 40%, Proposal 60%, Won 100%, Lost 0%, and can be edited), priority stars, expected decision date, and a required reason when it is lost. Dragging a card to Lost asks for the reason.
+- **Follow-ups (Odoo activities):** plan calls, meetings, WhatsApp messages, emails or to-dos on an enquiry, tick them off, and see overdue ones in red on the table and the dashboard.
 - **Clients:** list, search, and a profile showing weddings, enquiry history and what the couple still owes.
 - **Dashboard:** revenue, expenses, profit, money couples still owe, enquiries by source, profit per wedding, vendor payments due this week, upcoming consultations and a late-vendors alert.
 
