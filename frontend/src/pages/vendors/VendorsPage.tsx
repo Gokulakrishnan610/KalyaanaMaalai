@@ -116,9 +116,14 @@ export default function VendorsPage() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {data.results.map((v) => (
                 <Link key={v.id} to={`/vendors/${v.id}`} className="block rounded-xl focus-visible:outline-2 focus-visible:outline-brand-500">
-                  <Card className="h-full transition-shadow hover:shadow-md">
+                  <Card lift className="h-full">
                     <div className="flex items-start justify-between gap-2">
-                      <h2 className="font-semibold text-slate-900">{v.name}</h2>
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-sm font-bold text-white shadow-md shadow-brand-500/25">
+                          {v.name.charAt(0).toUpperCase()}
+                        </span>
+                        <h2 className="font-semibold text-slate-900">{v.name}</h2>
+                      </div>
                       <Badge tone="brand">{v.category_name}</Badge>
                     </div>
                     <div className="mt-2">

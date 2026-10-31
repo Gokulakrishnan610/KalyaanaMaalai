@@ -3,7 +3,8 @@ import { useRef, useState, type DragEvent } from 'react'
 import { api, post, ApiError } from '@/api/client'
 import { Button, Input, Modal, Select, cn } from '@/components/common'
 import { formatINR, paiseToRupees, rupeesToPaise } from '@/helpers/money'
-import type { Quotation, QuotationDraft, QuotationRequest } from './types'
+import { normalise, templateFor, type CategoryTemplate } from './categoryTemplates'
+import type { Quotation, QuotationDraft, QuotationItem, QuotationRequest } from './types'
 
 interface Props {
   request: QuotationRequest
@@ -18,6 +19,34 @@ interface Line {
   description: string
   qty: string
   price: string // rupees, as typed
+  unit: string
+  /** A row from the category's list (its name is fixed) as opposed to a custom item the planner added. */
+  preset: boolean
+}
+
+/** The category's standard rows first, then any other items as custom rows. Items with a known name fill its row. */
+function buildLines(
+  template: CategoryTemplate,
+  items: Pick<QuotationItem, 'description' | 'qty' | 'unit_price_paise'>[],
+  guests: number | null,
+): Line[] {
+  const lines: Line[] = template.rows.map((r) => ({
+    description: r.label,
+    qty: String(r.qty === 'guests' ? (guests ?? 1) : r.qty),
+    price: '',
+    unit: r.unit,
+    preset: true,
+  }))
+  for (const item of items) {
+    const match = lines.find((l) => l.preset && l.price === '' && normalise(l.description) === normalise(item.description))
+    if (match) {
+      match.qty = String(item.qty)
+      match.price = rupees(item.unit_price_paise)
+    } else {
+      lines.push({ description: item.description, qty: String(item.qty), price: rupees(item.unit_price_paise), unit: 'qty', preset: false })
+    }
+  }
+  return lines
 }
 
 type AiField = 'vendor' | 'total' | 'perPlate' | 'validTill' | 'menuNotes' | 'items'
@@ -46,16 +75,17 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
   const [total, setTotal] = useState(rupees(quotation?.total_paise))
   const [validTill, setValidTill] = useState(quotation?.valid_till ?? '')
   const [menuNotes, setMenuNotes] = useState(quotation?.menu_notes ?? '')
-  const [lines, setLines] = useState<Line[]>(
-    quotation?.items.map((i) => ({ description: i.description, qty: String(i.qty), price: rupees(i.unit_price_paise) })) ?? [],
-  )
+  // the form follows the request's category: a caterer sees plates and menus, a DJ sees hours and equipment
+  const template = templateFor(request.category_name)
+  const [lines, setLines] = useState<Line[]>(() => buildLines(template, quotation?.items ?? [], request.guest_count))
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState('')
   const [dragging, setDragging] = useState(false)
   const [aiFields, setAiFields] = useState<Set<AiField>>(new Set())
   const [aiMessage, setAiMessage] = useState('')
 
-  const filledLines = lines.filter((l) => l.description.trim())
+  // a row counts once a price is typed in it
+  const filledLines = lines.filter((l) => l.description.trim() && l.price.trim() !== '')
   const itemsTotal = filledLines.reduce((sum, l) => sum + (Number(l.qty) || 0) * rupeesToPaise(l.price), 0)
   const hasItems = filledLines.length > 0
   const guests = request.guest_count
@@ -117,11 +147,15 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
       }
       if (draft.items?.length) {
         setLines(
-          draft.items.map((i) => ({
-            description: i.description ?? '',
-            qty: String(i.qty ?? i.quantity ?? 1),
-            price: rupees(i.unit_price_paise ?? 0),
-          })),
+          buildLines(
+            template,
+            draft.items.map((i) => ({
+              description: i.description ?? '',
+              qty: i.qty ?? i.quantity ?? 1,
+              unit_price_paise: i.unit_price_paise ?? 0,
+            })),
+            request.guest_count,
+          ),
         )
         filled.add('items')
       }
@@ -246,17 +280,19 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
             </option>
           ))}
         </Select>
-        <Input
-          label="Price per plate (₹)"
-          inputMode="decimal"
-          value={perPlate}
-          className={mark('perPlate')}
-          error={errors.price_per_plate_paise}
-          onChange={(e) => {
-            setPerPlate(e.target.value)
-            edited('perPlate')
-          }}
-        />
+        {template.perPlate && (
+          <Input
+            label="Price per plate (₹)"
+            inputMode="decimal"
+            value={perPlate}
+            className={mark('perPlate')}
+            error={errors.price_per_plate_paise}
+            onChange={(e) => {
+              setPerPlate(e.target.value)
+              edited('perPlate')
+            }}
+          />
+        )}
         <Input
           label="Valid till"
           type="date"
@@ -271,30 +307,53 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
       </div>
 
       <div>
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-700">Line items (optional)</span>
-          <Button type="button" variant="ghost" onClick={() => setLines((l) => [...l, { description: '', qty: '1', price: '' }])}>
-            + Add line
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm font-medium text-slate-700">
+            {request.category_name} pricing{' '}
+            <span className="font-normal text-slate-500">· fill in what the vendor quoted, leave the rest empty</span>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setLines((l) => [...l, { description: '', qty: '1', price: '', unit: 'qty', preset: false }])}
+          >
+            + Add custom item
           </Button>
         </div>
-        {lines.length > 0 && (
-          <div className={cn('space-y-2 rounded-lg p-2', mark('items'))}>
-            {lines.map((line, index) => (
-              <div key={index} className="grid grid-cols-[1fr_5rem_7rem_auto] items-center gap-2">
+        <div className={cn('space-y-2 rounded-lg p-2', mark('items'))}>
+          <div className="hidden grid-cols-[1fr_6rem_7rem_6rem_1.5rem] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
+            <span>Item</span>
+            <span>Quantity</span>
+            <span>₹ each</span>
+            <span className="text-right">Amount</span>
+            <span />
+          </div>
+          {lines.map((line, index) => {
+            const amount = (Number(line.qty) || 0) * rupeesToPaise(line.price)
+            return (
+              <div key={index} className="grid grid-cols-[1fr_5rem_6rem] items-center gap-2 sm:grid-cols-[1fr_6rem_7rem_6rem_1.5rem]">
+                {line.preset ? (
+                  <span className="text-sm text-slate-700">
+                    {line.description} <span className="text-xs text-slate-400">({line.unit})</span>
+                  </span>
+                ) : (
+                  <input
+                    aria-label={`Custom item ${index + 1} name`}
+                    placeholder="Item name"
+                    value={line.description}
+                    onChange={(e) => {
+                      setLine(index, { description: e.target.value })
+                      edited('items')
+                    }}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                  />
+                )}
                 <input
-                  aria-label={`Item ${index + 1} description`}
-                  placeholder="e.g. Welcome drinks"
-                  value={line.description}
-                  onChange={(e) => {
-                    setLine(index, { description: e.target.value })
-                    edited('items')
-                  }}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
-                />
-                <input
-                  aria-label={`Item ${index + 1} quantity`}
+                  aria-label={`${line.description || 'Custom item'} quantity (${line.unit})`}
                   type="number"
-                  min={1}
+                  min={0}
+                  title={line.unit}
+                  placeholder={line.unit}
                   value={line.qty}
                   onChange={(e) => {
                     setLine(index, { qty: e.target.value })
@@ -303,7 +362,7 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
                 />
                 <input
-                  aria-label={`Item ${index + 1} price each in rupees`}
+                  aria-label={`${line.description || 'Custom item'} price each in rupees`}
                   placeholder="₹ each"
                   inputMode="decimal"
                   value={line.price}
@@ -313,18 +372,23 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
                   }}
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
                 />
-                <button
-                  type="button"
-                  aria-label={`Remove item ${index + 1}`}
-                  onClick={() => setLines((l) => l.filter((_, i) => i !== index))}
-                  className="px-1 text-slate-400 hover:text-red-600"
-                >
-                  ✕
-                </button>
+                <span className="hidden text-right text-sm text-slate-600 sm:block">{line.price.trim() ? formatINR(amount) : '—'}</span>
+                {line.preset ? (
+                  <span className="hidden sm:block" />
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={`Remove custom item ${index + 1}`}
+                    onClick={() => setLines((l) => l.filter((_, i) => i !== index))}
+                    className="px-1 text-slate-400 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            )
+          })}
+        </div>
         {errors.items && <p className="mt-1 text-xs text-red-600">{errors.items}</p>}
       </div>
 
@@ -350,9 +414,10 @@ function FormBody({ request, quotation, vendorId, onClose }: Props) {
           )}
         </div>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Menu notes</span>
+          <span className="mb-1 block font-medium text-slate-700">{template.notesLabel}</span>
           <textarea
             rows={3}
+            placeholder={template.notesHint}
             value={menuNotes}
             onChange={(e) => {
               setMenuNotes(e.target.value)

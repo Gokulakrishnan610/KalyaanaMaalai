@@ -14,8 +14,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { cn } from '@/components/common'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Emblem, cn } from '@/components/common'
 import { LiveStatus } from '@/live/LiveStatus'
 import { useLogin } from '@/login/LoginContext'
 import { NotificationBell } from '@/pages/notifications/NotificationBell'
@@ -44,6 +44,7 @@ function initials(name: string | undefined) {
 export function AppLayout() {
   const { user, logout } = useLogin()
   const navigate = useNavigate()
+  const location = useLocation()
   // start with a slim sidebar on small screens
   const [collapsed, setCollapsed] = useState(() => window.innerWidth < 768)
   const [search, setSearch] = useState('')
@@ -55,13 +56,28 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex h-full">
-      <aside className={cn('flex flex-col bg-sidebar text-slate-300 transition-all', collapsed ? 'w-[72px]' : 'w-64')}>
+    <div className="relative isolate flex h-full">
+      {/* soft drifting colour behind everything */}
+      <div className="aurora pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+        <span className="-left-24 top-10 h-96 w-96 bg-brand-100" />
+        <span className="right-0 top-1/3 h-[28rem] w-[28rem] bg-lavender" style={{ animationDelay: '-7s' }} />
+        <span className="bottom-0 left-1/3 h-80 w-80 bg-sand" style={{ animationDelay: '-13s' }} />
+      </div>
+      <aside
+        className={cn(
+          'relative flex flex-col overflow-hidden bg-gradient-to-b from-sidebar via-sidebar to-[#2a1530] text-slate-300 transition-[width] duration-300 ease-out',
+          collapsed ? 'w-[72px]' : 'w-64',
+        )}
+      >
+        <div className="pointer-events-none absolute -bottom-16 -left-10 h-48 w-48 rounded-full bg-brand-500/20 blur-3xl" aria-hidden="true" />
         <div className="flex h-16 items-center justify-between px-4">
           {!collapsed && (
-            <div className="leading-tight">
-              <div className="font-semibold tracking-wide text-white">KalyaanaMaalai</div>
-              <div className="text-[11px] text-slate-400">Shaandaar Events</div>
+            <div className="flex items-center gap-2.5 leading-tight">
+              <Emblem className="float h-9 w-9" />
+              <div>
+                <div className="font-semibold tracking-wide text-white">KalyaanaMaalai</div>
+                <div className="text-[11px] text-slate-400">Shaandaar Events</div>
+              </div>
             </div>
           )}
           <button
@@ -81,13 +97,15 @@ export function AppLayout() {
               title={label}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30' : 'hover:bg-sidebar-hover hover:text-white',
+                  'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-md shadow-brand-500/30'
+                    : 'hover:translate-x-1 hover:bg-sidebar-hover hover:text-white',
                   collapsed && 'justify-center',
                 )
               }
             >
-              <Icon size={18} className="shrink-0" />
+              <Icon size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-125 group-hover:-rotate-6" />
               {!collapsed && label}
             </NavLink>
           ))}
@@ -100,7 +118,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center gap-4 border-b border-slate-200/70 bg-white px-6">
+        <header className="flex h-16 items-center gap-4 border-b border-slate-200/70 bg-white/80 px-6 backdrop-blur">
           <form onSubmit={onSearch} className="relative max-w-md flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -137,7 +155,10 @@ export function AppLayout() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          <Outlet />
+          {/* keyed by address, so every screen change replays the entrance animation */}
+          <div key={location.pathname} className="page-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

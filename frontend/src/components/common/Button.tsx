@@ -19,7 +19,8 @@ export function Button({ variant = 'primary', loading, className, children, disa
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed',
+        'btn inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed',
+        variant === 'primary' && 'btn-primary',
         styles[variant],
         className,
       )}

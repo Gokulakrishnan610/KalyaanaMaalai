@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { get, remove } from '@/api/client'
-import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Spinner, cn } from '@/components/common'
+import { Badge, Button, Card, CardTitle, CountUp, EmptyState, ErrorState, Spinner, cn } from '@/components/common'
 import { formatDate } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
 import { RateVendorModal } from './RateVendorModal'
@@ -134,11 +134,15 @@ function Overview({ vendor }: { vendor: VendorProfile }) {
       <div className="grid gap-4">
         <Card>
           <div className="text-sm text-slate-500">Weddings with us</div>
-          <div className="mt-1 text-2xl font-semibold">{vendor.weddings_count}</div>
+          <div className="mt-1 text-2xl font-semibold">
+            <CountUp value={vendor.weddings_count} />
+          </div>
         </Card>
         <Card>
           <div className="text-sm text-slate-500">Total paid to them</div>
-          <div className="mt-1 text-2xl font-semibold">{formatINR(vendor.total_paid_paise)}</div>
+          <div className="mt-1 text-2xl font-semibold">
+            <CountUp value={vendor.total_paid_paise} format={formatINR} />
+          </div>
         </Card>
       </div>
     </div>
@@ -211,7 +215,7 @@ function Bar({ label, value, max, text, hint }: { label: string; value: number |
         <span className="text-slate-600">{value == null ? 'No data yet' : text}</span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-slate-100" role="meter" aria-label={label} aria-valuenow={value ?? 0} aria-valuemax={max}>
-        <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${percent}%` }} />
+        <div className="bar-grow h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500" style={{ width: `${percent}%` }} />
       </div>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
@@ -226,7 +230,7 @@ function Scorecard({ performance: p }: { performance: Performance }) {
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="flex flex-col items-center justify-center text-center">
         <div className="text-sm text-slate-500">Overall score</div>
-        <div className="mt-1 text-5xl font-semibold text-brand-700">{p.score ?? '—'}</div>
+        <div className="mt-1 text-5xl font-semibold text-brand-700">{p.score == null ? '—' : <CountUp value={p.score} />}</div>
         <div className="text-xs text-slate-500">out of 100 · from {p.ratings_count} rating{p.ratings_count === 1 ? '' : 's'}</div>
       </Card>
       <Card className="space-y-4 lg:col-span-2">
