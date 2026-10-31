@@ -1,5 +1,6 @@
 """Project settings. Values that change per machine come from the .env file in the repo root."""
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -46,6 +47,8 @@ INSTALLED_APPS = [
     "ai_tools",
     "notifications",
     "dashboard",
+    "incidents",
+    "live",
 ]
 
 MIDDLEWARE = [
@@ -121,7 +124,7 @@ SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("LOGIN_MINUTES"
 
 FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173")
 CORS_ALLOWED_ORIGINS = [FRONTEND_URL, "http://localhost:5173"]
-CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key"]  # lets the website retry a payment safely
+CORS_ALLOW_HEADERS = [*default_headers, "idempotency-key", "last-event-id"]  # lets the website retry a payment safely
 CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
 
 # --- Outside services. While MOCK_EXTERNALS is true they return fake answers, so the demo never breaks.
@@ -141,3 +144,15 @@ EMAIL_BACKEND = (
     if MOCK_EXTERNALS or not EMAIL_HOST
     else "django.core.mail.backends.smtp.EmailBackend"
 )
+
+# --- Live updates and background work (both use Redis) ---
+TESTING = "test" in sys.argv
+REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")
+LIVE_BACKEND = "memory" if TESTING else "redis"  # tests keep events in memory, so they need no Redis
+LIVE_ALERTS = not TESTING  # saved alerts for new quotations and payments (tests turn them on when needed)
+CELERY_BROKER_URL = REDIS_URL
+CELERY_TASK_ALWAYS_EAGER = TESTING  # in tests, background tasks simply run on the spot
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TIMEZONE = "UTC"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+WHITENOISE_USE_FINDERS = DEBUG  # lets the admin look right when the server is started with uvicorn
