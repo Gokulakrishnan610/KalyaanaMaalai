@@ -19,7 +19,9 @@ def convert_to_client(enquiry: Enquiry, create_wedding: bool = False, title: str
             city=enquiry.venue_city,
         )
     enquiry.status = Status.WON
-    enquiry.save(update_fields=["client", "status"])
+    enquiry.win_chance = 100
+    enquiry.lost_reason = ""
+    enquiry.save(update_fields=["client", "status", "win_chance", "lost_reason"])
 
     wedding = None
     if create_wedding:

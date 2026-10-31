@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import Role, User
 from clients.models import Client
-from enquiries.models import Enquiry, Status
+from enquiries.models import Enquiry, FollowUp, Status
 
 
 class EnquiryTests(APITestCase):
@@ -79,3 +79,65 @@ class EnquiryTests(APITestCase):
         self.client.force_authenticate(self.planner)
         res = self.client.post(f"/api/enquiries/{enquiry.id}/convert/", {"create_wedding": True}, format="json")
         self.assertEqual(res.status_code, 400)
+
+
+class CrmFieldsTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.planner = User.objects.create_user("p@t.com", "Planner", "Password123", role=Role.PLANNER)
+        cls.staff = User.objects.create_user("s@t.com", "Staff", "Password123", role=Role.STAFF)
+
+    def make(self, **extra):
+        data = {"couple_name": "Kabir & Sana", "phone": "9898989898", "source": "CALL"}
+        self.client.force_authenticate(self.planner)
+        return self.client.post("/api/enquiries/", {**data, **extra}).data
+
+    def test_win_chance_follows_the_stage_unless_set_by_hand(self):
+        enquiry = self.make()
+        self.assertEqual(enquiry["win_chance"], 10)
+        moved = self.client.patch(f"/api/enquiries/{enquiry['id']}/", {"status": "PROPOSAL"}).data
+        self.assertEqual(moved["win_chance"], 60)
+        manual = self.client.patch(f"/api/enquiries/{enquiry['id']}/", {"status": "CONSULTATION", "win_chance": 75}).data
+        self.assertEqual(manual["win_chance"], 75)
+
+    def test_losing_needs_a_reason(self):
+        enquiry = self.make()
+        url = f"/api/enquiries/{enquiry['id']}/"
+        self.assertEqual(self.client.patch(url, {"status": "LOST"}).status_code, 400)
+        res = self.client.patch(url, {"status": "LOST", "lost_reason": "BUDGET"})
+        self.assertEqual((res.status_code, res.data["win_chance"]), (200, 0))
+
+    def test_priority_and_win_chance_limits(self):
+        enquiry = self.make()
+        url = f"/api/enquiries/{enquiry['id']}/"
+        self.assertEqual(self.client.patch(url, {"priority": 5}).status_code, 400)
+        self.assertEqual(self.client.patch(url, {"win_chance": 150}).status_code, 400)
+
+    def test_converting_makes_the_chance_100(self):
+        enquiry = self.make()
+        res = self.client.post(f"/api/enquiries/{enquiry['id']}/convert/", {}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(Enquiry.objects.get(id=enquiry["id"]).win_chance, 100)
+
+    def test_follow_ups_can_be_added_listed_and_marked_done_once(self):
+        enquiry = self.make()
+        due = timezone.now() - timedelta(hours=1)
+        body = {"enquiry": enquiry["id"], "kind": "CALL", "summary": "Ask about venue", "due_at": due.isoformat()}
+        created = self.client.post("/api/follow-ups/", body)
+        self.assertEqual(created.status_code, 201)
+        self.assertTrue(created.data["is_overdue"])
+        listed = self.client.get("/api/enquiries/?q=Kabir").data["results"][0]
+        self.assertIsNotNone(listed["next_follow_up"])
+        first = self.client.post(f"/api/follow-ups/{created.data['id']}/done/").data["done_at"]
+        again = self.client.post(f"/api/follow-ups/{created.data['id']}/done/").data["done_at"]
+        self.assertEqual(first, again)
+        self.assertEqual(self.client.get("/api/follow-ups/?open=1").data, [])
+        self.assertIsNone(self.client.get("/api/enquiries/?q=Kabir").data["results"][0]["next_follow_up"])
+
+    def test_staff_can_see_but_not_add_follow_ups(self):
+        enquiry = self.make()
+        FollowUp.objects.create(enquiry_id=enquiry["id"], summary="x", due_at=timezone.now())
+        self.client.force_authenticate(self.staff)
+        self.assertEqual(self.client.get("/api/follow-ups/").status_code, 200)
+        body = {"enquiry": enquiry["id"], "summary": "y", "due_at": timezone.now().isoformat()}
+        self.assertEqual(self.client.post("/api/follow-ups/", body).status_code, 403)
