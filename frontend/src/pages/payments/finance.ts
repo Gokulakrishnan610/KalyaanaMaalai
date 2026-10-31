@@ -10,20 +10,23 @@ export async function postWithKey<T>(url: string, body: unknown, key: string): P
   return (await api.post<T>(url, body, { headers: { 'Idempotency-Key': key } })).data
 }
 
-/** Refresh every finance number after a change (the dashboard shows the same figures). */
-export function useRefreshFinance(weddingId: number) {
+/** Refresh every money number after a change (the dashboard and client pages show the same figures). */
+export function useRefreshMoney() {
   const queryClient = useQueryClient()
   return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['finance', weddingId] }),
-      queryClient.invalidateQueries({ queryKey: ['finance-overview'] }),
-      queryClient.invalidateQueries({ queryKey: ['upcoming-payments'] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
-    ])
+    Promise.all(
+      ['finance', 'finance-overview', 'dashboard', 'clients', 'notifications'].map((key) =>
+        queryClient.invalidateQueries({ queryKey: [key] }),
+      ),
+    )
 }
 
 /** "12,500" for a rupee amount typed in a box, from whole paise. */
 export function rupeeText(paise: number): string {
   return paise % 100 === 0 ? String(paise / 100) : (paise / 100).toFixed(2)
+}
+
+/** The public address a customer opens, built from where this website is running. */
+export function linkUrl(path: string): string {
+  return `${window.location.origin}${path}`
 }

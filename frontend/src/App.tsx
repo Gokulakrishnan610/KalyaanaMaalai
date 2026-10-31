@@ -9,6 +9,7 @@ import EnquiriesPage from '@/pages/enquiries/EnquiriesPage'
 import IncidentsPage from '@/pages/incidents/IncidentsPage'
 import LoginPage from '@/pages/login/LoginPage'
 import NotificationsPage from '@/pages/notifications/NotificationsPage'
+import PublicPayPage from '@/pages/pay/PublicPayPage'
 import PaymentsPage from '@/pages/payments/PaymentsPage'
 import QuotationsPage from '@/pages/quotations/QuotationsPage'
 import RequestDetailPage from '@/pages/quotations/RequestDetailPage'
@@ -24,6 +25,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/checkin/:token" element={<CheckinPage />} />
+        <Route path="/pay/:token" element={<PublicPayPage />} />
         <Route element={<RequireLogin />}>
           <Route element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
