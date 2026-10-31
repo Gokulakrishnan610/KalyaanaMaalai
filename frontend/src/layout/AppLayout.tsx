@@ -17,7 +17,8 @@ const NAV = [
 export function AppLayout() {
   const { user, logout } = useLogin()
   const navigate = useNavigate()
-  const [collapsed, setCollapsed] = useState(false)
+  // start with a slim sidebar on small screens
+  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 768)
 
   return (
     <div className="flex h-full">

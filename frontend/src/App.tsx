@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { RequireLogin } from '@/components/RequireLogin'
 import { AppLayout } from '@/layout/AppLayout'
+import ClientPage from '@/pages/clients/ClientPage'
 import ClientsPage from '@/pages/clients/ClientsPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 import EnquiriesPage from '@/pages/enquiries/EnquiriesPage'
@@ -22,6 +23,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="enquiries" element={<EnquiriesPage />} />
             <Route path="clients" element={<ClientsPage />} />
+            <Route path="clients/:id" element={<ClientPage />} />
             <Route path="weddings" element={<WeddingsPage />} />
             <Route path="vendors" element={<VendorsPage />} />
             <Route path="quotations" element={<QuotationsPage />} />
