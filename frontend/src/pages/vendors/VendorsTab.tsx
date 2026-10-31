@@ -80,7 +80,7 @@ export function VendorsTab({ weddingId }: { weddingId: number }) {
         <div className="grid gap-3">
           {requests.data?.map((r) => (
             <Link key={r.id} to={`/quotations/${r.id}`} className="block">
-              <Card className="flex flex-wrap items-center justify-between gap-3 transition-shadow hover:shadow-md">
+              <Card lift className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="font-medium">{r.category_name}</div>
                   <div className="text-sm text-slate-500">

@@ -3,6 +3,7 @@ from django.db.models.functions import Coalesce
 from rest_framework import serializers
 
 from clients.models import Client
+from clients.services import find_client
 from common.validators import check_phone
 from payments.models import Invoice, Payment
 from weddings.models import Wedding
@@ -11,11 +12,22 @@ from weddings.models import Wedding
 class ClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
-        fields = ["id", "couple_name", "bride_name", "groom_name", "phone", "email", "city", "created_at"]
+        fields = ["id", "couple_name", "client_name", "spouse_name", "spouse_email", "bride_name", "groom_name",
+                  "phone", "email", "city", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def validate_phone(self, value):
         return check_phone(value)
+
+    def validate(self, attrs):
+        # one client per client name + email: say who already has it instead of failing in the database
+        name = attrs.get("client_name", self.instance.client_name if self.instance else "")
+        email = attrs.get("email", self.instance.email if self.instance else "")
+        existing = find_client(name, email)
+        if existing and (self.instance is None or existing.pk != self.instance.pk):
+            raise serializers.ValidationError(
+                {"email": f"{existing.client_name or existing.couple_name} is already a client with this email."})
+        return attrs
 
 
 class ClientWeddingSerializer(serializers.ModelSerializer):

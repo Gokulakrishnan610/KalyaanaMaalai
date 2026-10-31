@@ -37,7 +37,7 @@ function FormBody({ weddingId, onClose, onCreated }: Props) {
   const [requirements, setRequirements] = useState('')
   const [guests, setGuests] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [invited, setInvited] = useState<number[]>([])
+  const [unticked, setUnticked] = useState<number[]>([])
   const [warnings, setWarnings] = useState<string[] | null>(null)
   const [created, setCreated] = useState<QuotationRequest | null>(null)
 
@@ -52,6 +52,8 @@ function FormBody({ weddingId, onClose, onCreated }: Props) {
     queryFn: () => get<Page<Vendor>>('/vendors/', { category_id: categoryId, limit: 100 }),
     enabled: !!categoryId,
   })
+  const allIds = vendors.data?.results.map((v) => v.id) ?? []
+  const invited = allIds.filter((id) => !unticked.includes(id))
   const categoryName = categories?.find((c) => String(c.id) === categoryId)?.name
   const fewCaterers = categoryName === 'Caterer' && invited.length > 0 && invited.length < CATERER_MINIMUM
 
@@ -79,7 +81,7 @@ function FormBody({ weddingId, onClose, onCreated }: Props) {
   }
 
   function toggle(id: number) {
-    setInvited((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]))
+    setUnticked((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]))
   }
 
   function submit(e: FormEvent) {
@@ -125,7 +127,7 @@ function FormBody({ weddingId, onClose, onCreated }: Props) {
           error={errors.category_id}
           onChange={(e) => {
             setCategoryId(e.target.value)
-            setInvited([])
+            setUnticked([])
           }}
         >
           <option value="">Choose…</option>
@@ -151,7 +153,16 @@ function FormBody({ weddingId, onClose, onCreated }: Props) {
       </label>
 
       <fieldset>
-        <legend className="mb-1 text-sm font-medium text-slate-700">Invite vendors</legend>
+        <div className="mb-1 flex items-center justify-between">
+          <legend className="text-sm font-medium text-slate-700">
+            Invite vendors{allIds.length > 0 && ` (${invited.length} of ${allIds.length} selected)`}
+          </legend>
+          {allIds.length > 0 && (
+            <button type="button" className="text-xs font-medium text-brand-700 hover:underline" onClick={() => setUnticked(invited.length === allIds.length ? allIds : [])}>
+              {invited.length === allIds.length ? 'Clear all' : 'Select all'}
+            </button>
+          )}
+        </div>
         {!categoryId && <p className="text-sm text-slate-500">Choose a category to see its vendors.</p>}
         {vendors.isLoading && <p className="text-sm text-slate-500">Loading vendors…</p>}
         {vendors.data && vendors.data.results.length === 0 && (
@@ -160,7 +171,7 @@ function FormBody({ weddingId, onClose, onCreated }: Props) {
         <div className="grid max-h-52 gap-1 overflow-y-auto sm:grid-cols-2">
           {vendors.data?.results.map((v) => (
             <label key={v.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-              <input type="checkbox" checked={invited.includes(v.id)} onChange={() => toggle(v.id)} />
+              <input type="checkbox" checked={!unticked.includes(v.id)} onChange={() => toggle(v.id)} />
               <span className="flex-1">
                 {v.name}
                 <span className="block text-xs text-slate-500">

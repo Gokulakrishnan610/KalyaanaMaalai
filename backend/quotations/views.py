@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -53,13 +54,18 @@ def caterer_warnings(category, invited_count) -> list[str]:
 
 
 class AllRequests(PlannerWrites):
-    """All quotation requests, newest first. Filter with ?status=OPEN|CLOSED."""
+    """All quotation requests, newest first. Filter with ?status=OPEN|CLOSED and search with ?q= (wedding, couple, requirement)."""
 
     @extend_schema(responses=RequestSerializer(many=True))
     def get(self, request):
         queryset = requests_queryset()
         if request.query_params.get("status"):
             queryset = queryset.filter(status=request.query_params["status"])
+        text = request.query_params.get("q", "").strip()
+        if text:
+            queryset = queryset.filter(
+                Q(wedding__title__icontains=text) | Q(wedding__client__couple_name__icontains=text)
+                | Q(category__name__icontains=text) | Q(requirements__icontains=text))
         return Response(RequestSerializer(queryset, many=True).data)
 
 

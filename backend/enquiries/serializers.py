@@ -6,7 +6,9 @@ from enquiries.models import STAGE_WIN_CHANCE, Enquiry, FollowUp, Status
 
 
 class EnquirySerializer(serializers.ModelSerializer):
-    client_name = serializers.CharField(source="client.couple_name", read_only=True, default=None)
+    linked_client_name = serializers.CharField(source="client.couple_name", read_only=True, default=None)
+    couple_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    client_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     owner_name = serializers.CharField(source="owner.name", read_only=True, default=None)
 
     next_follow_up = serializers.SerializerMethodField()
@@ -16,8 +18,8 @@ class EnquirySerializer(serializers.ModelSerializer):
         fields = [
             "id", "couple_name", "phone", "email", "source", "status", "wedding_date", "guest_count",
             "budget_paise", "venue_city", "consultation_at", "notes", "expected_revenue_paise", "win_chance",
-            "priority", "expected_close_date", "lost_reason", "next_follow_up", "client", "client_name",
-            "owner", "owner_name", "partner_name", "functions_wanted", "services_needed",
+            "priority", "expected_close_date", "lost_reason", "next_follow_up", "client", "linked_client_name",
+            "client_name", "spouse_email", "owner", "owner_name", "partner_name", "functions_wanted", "services_needed",
             "preferred_contact", "profile_complete", "created_at",
         ]
         read_only_fields = ["id", "client", "profile_complete", "created_at"]  # the client is set by "convert"
@@ -43,6 +45,15 @@ class EnquirySerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        # the couple's display name comes from the client and spouse names unless one was typed
+        client_name = attrs.get("client_name", self.instance.client_name if self.instance else "")
+        spouse = attrs.get("partner_name", self.instance.partner_name if self.instance else "")
+        shown = attrs.get("couple_name", self.instance.couple_name if self.instance else "")
+        if not shown.strip():
+            shown = " & ".join(n.strip() for n in (client_name, spouse) if n and n.strip())
+            if not shown:
+                raise serializers.ValidationError({"client_name": "Enter the client's name."})
+            attrs["couple_name"] = shown
         current = self.instance.status if self.instance else None
         status = attrs.get("status", current or Status.NEW)
         if "status" in attrs and attrs["status"] != current and "win_chance" not in attrs:

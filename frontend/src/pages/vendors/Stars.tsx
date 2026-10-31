@@ -6,7 +6,7 @@ export function Stars({ value, size = 'text-base' }: { value: number | null | un
     <span className={`inline-flex items-center gap-1.5 ${size}`} title={`${value.toFixed(1)} out of 5`}>
       <span className="relative inline-block leading-none" aria-hidden="true">
         <span className="text-slate-300">★★★★★</span>
-        <span className="absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap text-amber-400" style={{ width: `${percent}%` }}>
+        <span className="star-fill absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap text-amber-400" style={{ width: `${percent}%` }}>
           ★★★★★
         </span>
       </span>

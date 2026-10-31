@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import { useDeferredValue, useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { get, type Page } from '@/api/client'
-import { Badge, Button, EmptyState, ErrorState, Select, Spinner, Table, Td, Th } from '@/components/common'
+import { get, patch, type Page } from '@/api/client'
+import { Button, EmptyState, ErrorState, SearchBox, Select, Spinner, StatusSelect, Table, Td, Th } from '@/components/common'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { formatDate } from '@/helpers/date'
 import { useLogin } from '@/login/LoginContext'
 import { NewWeddingForm } from './NewWeddingForm'
-import { WEDDING_STATUSES, type Wedding } from './types'
+import { WEDDING_STATUSES, type Wedding, type WeddingStatus } from './types'
 
 const PAGE_SIZE = 20
 
@@ -27,7 +28,8 @@ export default function WeddingsPage() {
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const deferred = useDeferredValue(search)
+  const deferred = useDebouncedValue(search.trim())
+  const queryClient = useQueryClient()
 
   // an enquiry or client page can link here as /weddings?clientId=3&guests=300&date=2027-02-10&budget=4500000
   const prefill = {
@@ -39,10 +41,30 @@ export default function WeddingsPage() {
   const hasPrefill = Object.values(prefill).some(Boolean)
   const [showForm, setShowForm] = useState(hasPrefill)
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['weddings', status, deferred, page],
-    queryFn: () =>
-      get<Page<Wedding>>('/weddings/', { status: status || undefined, q: deferred || undefined, page, limit: PAGE_SIZE }),
+  const queryKey = ['weddings', status, deferred, page]
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey,
+    queryFn: ({ signal }) =>
+      get<Page<Wedding>>('/weddings/', { status: status || undefined, q: deferred || undefined, page, limit: PAGE_SIZE }, signal),
+    placeholderData: keepPreviousData,
+  })
+
+  // changing a status in the table shows at once, and goes back if the server says no
+  const changeStatus = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: WeddingStatus }) => patch(`/weddings/${id}/`, { status }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['weddings'] })
+      const before = queryClient.getQueryData<Page<Wedding>>(queryKey)
+      if (before) {
+        queryClient.setQueryData<Page<Wedding>>(queryKey, {
+          ...before,
+          results: before.results.map((w) => (w.id === id ? { ...w, status } : w)),
+        })
+      }
+      return { before }
+    },
+    onError: (_e, _vars, context) => context?.before && queryClient.setQueryData(queryKey, context.before),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['weddings'] }),
   })
   const weddings = data?.results ?? []
   const pages = Math.max(1, Math.ceil((data?.count ?? 0) / PAGE_SIZE))
@@ -63,15 +85,15 @@ export default function WeddingsPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <input
-          aria-label="Search weddings"
+        <SearchBox
+          label="Search weddings"
           placeholder="Search title, couple or city"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
+          onChange={(value) => {
+            setSearch(value)
             setPage(1)
           }}
-          className="w-72 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          busy={search.trim() !== deferred || isFetching}
         />
         <Select
           aria-label="Filter by status"
@@ -110,7 +132,6 @@ export default function WeddingsPage() {
           </thead>
           <tbody>
             {weddings.map((w) => {
-              const status = WEDDING_STATUSES.find((s) => s.value === w.status)
               return (
                 <tr key={w.id} className="hover:bg-slate-50">
                   <Td>
@@ -121,7 +142,13 @@ export default function WeddingsPage() {
                   </Td>
                   <Td>{w.client_name}</Td>
                   <Td>
-                    <Badge tone={status?.tone}>{status?.label ?? w.status}</Badge>
+                    <StatusSelect
+                      label={`Status of ${w.title}`}
+                      value={w.status}
+                      options={WEDDING_STATUSES}
+                      readOnly={!hasRole('PLANNER')}
+                      onChange={(next) => changeStatus.mutate({ id: w.id, status: next })}
+                    />
                   </Td>
                   <Td>
                     {formatDate(w.start_date)}

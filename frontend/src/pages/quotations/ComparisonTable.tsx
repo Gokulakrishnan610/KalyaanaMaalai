@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Fragment, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { get, post } from '@/api/client'
-import { Badge, Button, EmptyState, ErrorState, Input, Modal, Spinner, cn } from '@/components/common'
+import { Badge, Button, Confetti, EmptyState, ErrorState, Input, Modal, Spinner, cn } from '@/components/common'
 import { formatDate } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
 import { Stars } from '@/pages/vendors/Stars'
@@ -33,6 +33,7 @@ function Row({ quotations, label, children }: { quotations: ComparedQuotation[];
 
 export function ComparisonTable({ requestId }: Props) {
   const [choosing, setChoosing] = useState<ComparedQuotation | null>(null)
+  const [celebrate, setCelebrate] = useState(false)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['comparison', requestId],
     queryFn: () => get<Comparison>(`/quotation-requests/${requestId}/compare/`),
@@ -76,7 +77,7 @@ export function ComparisonTable({ requestId }: Props) {
                     {q.status === 'REJECTED' && <Badge tone="red">Not chosen</Badge>}
                     {several && q.flags.best_value && (
                       <span title={`Best value: ${weightsText}. Score ${((q.score ?? 0) * 100).toFixed(0)}/100.`} tabIndex={0}>
-                        <Badge tone="brand">★ Best value</Badge>
+                        <span className="badge-shine inline-block rounded-full"><Badge tone="brand">★ Best value</Badge></span>
                       </span>
                     )}
                     {q.flags.expired && <Badge tone="amber">Quote expired</Badge>}
@@ -89,7 +90,7 @@ export function ComparisonTable({ requestId }: Props) {
           <tbody>
             <Row quotations={quotations} label="Total">
               {(q) => (
-                <span className={cn('inline-block rounded px-1.5 py-0.5 text-lg', q.flags.lowest_total ? LOWEST : 'font-semibold')}>
+                <span className={cn('inline-block rounded px-1.5 py-0.5 text-lg', q.flags.lowest_total ? `${LOWEST} pulse-glow` : 'font-semibold')}>
                   {formatINR(q.total_paise)}
                   {q.flags.lowest_total && <span className="ml-2 text-xs font-medium">Lowest</span>}
                 </span>
@@ -195,8 +196,18 @@ export function ComparisonTable({ requestId }: Props) {
       </div>
 
       {choosing && (
-        <SelectModal requestId={requestId} quotation={choosing} current={selected} onClose={() => setChoosing(null)} />
+        <SelectModal
+          requestId={requestId}
+          quotation={choosing}
+          current={selected}
+          onClose={() => setChoosing(null)}
+          onSelected={() => {
+            setCelebrate(true)
+            window.setTimeout(() => setCelebrate(false), 4200)
+          }}
+        />
       )}
+      {celebrate && <Confetti />}
     </div>
   )
 }
@@ -206,11 +217,13 @@ function SelectModal({
   quotation,
   current,
   onClose,
+  onSelected,
 }: {
   requestId: number
   quotation: ComparedQuotation
   current?: ComparedQuotation
   onClose: () => void
+  onSelected: () => void
 }) {
   const queryClient = useQueryClient()
   const [advance, setAdvance] = useState('30')
@@ -224,6 +237,7 @@ function SelectModal({
       for (const key of [['comparison', requestId], ['quotation-request', requestId], ['quotation-requests'], ['wedding-vendors'], ['vendors']]) {
         queryClient.invalidateQueries({ queryKey: key })
       }
+      onSelected()
       onClose()
     },
   })

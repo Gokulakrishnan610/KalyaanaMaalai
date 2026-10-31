@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  ArrowRight,
   Bell,
   CalendarHeart,
+  FileText,
   IndianRupee,
   ListChecks,
   Receipt,
+  Store,
   Truck,
   UserPlus,
   Wallet,
@@ -23,7 +26,7 @@ import {
   YAxis,
 } from 'recharts'
 import { get } from '@/api/client'
-import { Badge, Card, CardTitle, EmptyState, ErrorState, Spinner } from '@/components/common'
+import { Badge, Card, CardTitle, CountUp, EmptyState, Emblem, ErrorState, Spinner } from '@/components/common'
 import { formatDate, formatDateTime, timeAgo } from '@/helpers/date'
 import { formatINR } from '@/helpers/money'
 import { useLogin } from '@/login/LoginContext'
@@ -80,18 +83,104 @@ const TINTS = {
   sand: 'bg-sand text-amber-600',
 }
 
-function Kpi({ label, value, hint, icon: Icon, tint }: { label: string; value: string; hint: ReactNode; icon: LucideIcon; tint: keyof typeof TINTS }) {
+function Kpi({ label, value, hint, icon: Icon, tint }: { label: string; value: ReactNode; hint: ReactNode; icon: LucideIcon; tint: keyof typeof TINTS }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${TINTS[tint]}`}>
+    <div className="lift group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
+      {/* a soft tinted glow in the corner, the same colour as the icon */}
+      <div className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-60 blur-2xl transition-opacity group-hover:opacity-100 ${TINTS[tint].split(' ')[0]}`} aria-hidden="true" />
+      <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 ${TINTS[tint]}`}>
         <Icon size={22} />
       </div>
-      <div className="min-w-0">
+      <div className="relative min-w-0">
         <div className="text-xs font-medium text-slate-500">{label}</div>
         <div className="truncate text-2xl font-semibold">{value}</div>
         <div className="text-xs text-slate-500">{hint}</div>
       </div>
     </div>
+  )
+}
+
+const QUICK_LINKS: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: '/enquiries', label: 'New enquiry', icon: UserPlus },
+  { to: '/weddings', label: 'Weddings', icon: CalendarHeart },
+  { to: '/vendors', label: 'Vendors', icon: Store },
+  { to: '/quotations', label: 'Quotations', icon: FileText },
+]
+
+function greeting() {
+  const hour = new Date().getHours()
+  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+}
+
+/** The big welcome card at the top of the homepage: greeting, the next wedding and shortcuts. */
+function Hero({ name, nextWedding, pipeline, openEnquiries }: {
+  name: string
+  nextWedding: { title: string; date: string; progress_pct: number } | null
+  pipeline: number
+  openEnquiries: number
+}) {
+  const days = nextWedding ? Math.ceil((new Date(nextWedding.date).getTime() - Date.now()) / 86_400_000) : null
+  return (
+    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2a1530] via-[#5b1d44] to-brand-600 p-6 text-white shadow-xl shadow-brand-500/20 sm:p-8">
+      {/* decorative light and rings */}
+      <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-brand-500/40 blur-3xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-violet-500/30 blur-3xl" aria-hidden="true" />
+      <Emblem className="float pointer-events-none absolute -right-4 top-1/2 hidden h-52 w-52 -translate-y-1/2 opacity-25 sm:block" />
+      {[['58%', '16%', 0], ['72%', '70%', 1.2], ['40%', '78%', 2.1]].map(([x, y, d], i) => (
+        <svg key={i} viewBox="0 0 24 24" className="twinkle pointer-events-none absolute h-4 w-4 text-amber-300" style={{ left: x as string, top: y as string, animationDelay: `${d}s` }} aria-hidden="true">
+          <path fill="currentColor" d="M12 0l2.6 9.4L24 12l-9.4 2.6L12 24l-2.6-9.4L0 12l9.4-2.6z" />
+        </svg>
+      ))}
+
+      <div className="relative max-w-2xl">
+        <p className="text-sm font-medium text-rose-100/90">
+          {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+        </p>
+        <h1 className="mt-1 text-3xl font-bold sm:text-4xl" style={{ background: 'none', color: 'white', WebkitTextFillColor: 'white', animation: 'none' }}>
+          {greeting()}, {name}!
+        </h1>
+        <p className="mt-2 text-sm text-rose-100/90">
+          {nextWedding && days !== null ? (
+            days >= 0 ? (
+              <>
+                Your next wedding, <strong className="text-white">{nextWedding.title}</strong>, is in{' '}
+                <strong className="text-white">{days} day{days === 1 ? '' : 's'}</strong> and {nextWedding.progress_pct}% planned.
+              </>
+            ) : (
+              <>
+                <strong className="text-white">{nextWedding.title}</strong> is under way.
+              </>
+            )
+          ) : (
+            'No weddings are lined up yet. Convert an enquiry to start one.'
+          )}{' '}
+          {openEnquiries > 0 && (
+            <>
+              {openEnquiries} open enquir{openEnquiries === 1 ? 'y is' : 'ies are'} waiting
+              {pipeline > 0 && (
+                <>
+                  , worth about <strong className="text-white">{formatINR(pipeline)}</strong>
+                </>
+              )}
+              .
+            </>
+          )}
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {QUICK_LINKS.map(({ to, label, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              className="group inline-flex items-center gap-2 rounded-xl bg-white/12 px-3.5 py-2 text-sm font-medium text-white ring-1 ring-white/20 backdrop-blur transition-all hover:-translate-y-0.5 hover:bg-white hover:text-brand-700"
+            >
+              <Icon size={16} />
+              {label}
+              <ArrowRight size={14} className="-ml-1 w-0 opacity-0 transition-all group-hover:ml-0 group-hover:w-3.5 group-hover:opacity-100" />
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -123,6 +212,9 @@ export default function DashboardPage() {
   if (isLoading) return <Spinner />
   if (error || !data) return <ErrorState message={error?.message ?? 'Could not load the dashboard'} onRetry={refetch} />
 
+  // the wedding coming up soonest (or happening now), for the welcome card
+  const today = new Date().toISOString().slice(0, 10)
+  const nextWedding = [...data.per_wedding].filter((w) => w.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
   const sourceData = data.enquiries_by_source.map((s) => ({ name: sourceInfo(s.source).label, count: s.count }))
   const weddingData = data.per_wedding.map((w) => ({
     name: w.title.length > 14 ? `${w.title.slice(0, 14)}…` : w.title,
@@ -132,15 +224,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Welcome back, {user?.name.split(' ')[0]}!</h1>
-          <p className="text-sm text-slate-500">Here’s what’s happening with your weddings today.</p>
-        </div>
-        <div className="rounded-xl border border-slate-200/70 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
-          {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-        </div>
-      </div>
+      <Hero
+        name={user?.name.split(' ')[0] ?? ''}
+        nextWedding={nextWedding}
+        pipeline={data.pipeline_expected_paise}
+        openEnquiries={data.active_enquiries}
+      />
 
       {data.late_vendors_today > 0 && (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -155,12 +244,12 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Total weddings" value={String(data.total_weddings)} hint={`${data.ongoing_weddings} ongoing`} icon={CalendarHeart} tint="peach" />
-        <Kpi label="Total revenue" value={formatINR(data.total_revenue_paise)} hint={`${formatINR(data.total_received_paise)} received`} icon={Wallet} tint="lavender" />
-        <Kpi label="Total expenses" value={formatINR(data.total_expenses_paise)} hint={`Profit ${formatINR(data.total_profit_paise)}`} icon={Receipt} tint="mint" />
+        <Kpi label="Total weddings" value={<CountUp value={data.total_weddings} />} hint={`${data.ongoing_weddings} ongoing`} icon={CalendarHeart} tint="peach" />
+        <Kpi label="Total revenue" value={<CountUp value={data.total_revenue_paise} format={formatINR} />} hint={`${formatINR(data.total_received_paise)} received`} icon={Wallet} tint="lavender" />
+        <Kpi label="Total expenses" value={<CountUp value={data.total_expenses_paise} format={formatINR} />} hint={`Profit ${formatINR(data.total_profit_paise)}`} icon={Receipt} tint="mint" />
         <Kpi
           label="Active tasks"
-          value={String(data.open_tasks)}
+          value={<CountUp value={data.open_tasks} />}
           hint={<span className={data.overdue_tasks ? 'font-medium text-red-600' : ''}>{data.overdue_tasks} overdue</span>}
           icon={ListChecks}
           tint="sand"
@@ -185,7 +274,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-xs text-slate-500">{w.client_name} · {formatDate(w.date)}</div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-brand-500" style={{ width: `${w.progress_pct}%` }} />
+                    <div className="bar-grow h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500" style={{ width: `${w.progress_pct}%` }} />
                   </div>
                 </li>
               ))}

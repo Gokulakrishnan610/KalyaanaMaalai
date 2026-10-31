@@ -141,3 +141,77 @@ class CrmFieldsTests(APITestCase):
         self.assertEqual(self.client.get("/api/follow-ups/").status_code, 200)
         body = {"enquiry": enquiry["id"], "summary": "y", "due_at": timezone.now().isoformat()}
         self.assertEqual(self.client.post("/api/follow-ups/", body).status_code, 403)
+
+
+class ClientIdentityTests(APITestCase):
+    """A client is recognised by client name + email, so a returning client is never duplicated."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.planner = User.objects.create_user("p@t.com", "Planner", "Password123", role=Role.PLANNER)
+
+    def body(self, **extra):
+        return {"client_name": "Rohan Mehta", "phone": "9812345670", "email": "rohan@example.com",
+                "partner_name": "Ishita Rao", "spouse_email": "ishita@example.com", "source": "CALL",
+                "venue_city": "Udaipur", **extra}
+
+    def setUp(self):
+        self.client.force_authenticate(self.planner)
+
+    def test_enquiry_keeps_client_and_spouse_details_and_builds_the_couple_name(self):
+        res = self.client.post("/api/enquiries/", self.body())
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(res.data["couple_name"], "Rohan Mehta & Ishita Rao")
+        self.assertEqual((res.data["partner_name"], res.data["spouse_email"]), ("Ishita Rao", "ishita@example.com"))
+        self.assertIsNone(res.data["client"])
+
+    def test_a_client_name_is_needed_when_no_couple_name_is_given(self):
+        res = self.client.post("/api/enquiries/", self.body(client_name="", partner_name=""))
+        self.assertEqual(res.status_code, 400)
+
+    def test_converting_twice_with_the_same_name_and_email_makes_one_client(self):
+        first = self.client.post("/api/enquiries/", self.body()).data["id"]
+        second = self.client.post("/api/enquiries/", self.body(phone="9000000001", venue_city="Goa")).data["id"]
+        one = self.client.post(f"/api/enquiries/{first}/convert/", {}, format="json").data["client"]["id"]
+        two = self.client.post(f"/api/enquiries/{second}/convert/", {}, format="json").data["client"]["id"]
+        self.assertEqual(one, two)
+        self.assertEqual(Client.objects.count(), 1)
+
+    def test_name_and_email_match_ignores_capitals_and_a_new_enquiry_links_to_the_existing_client(self):
+        first = self.client.post("/api/enquiries/", self.body()).data["id"]
+        self.client.post(f"/api/enquiries/{first}/convert/", {}, format="json")
+        again = self.client.post("/api/enquiries/", self.body(client_name="ROHAN MEHTA", email="Rohan@Example.com"))
+        self.assertEqual(again.data["client"], Client.objects.get().id)
+
+    def test_same_name_with_a_different_email_is_a_different_client(self):
+        a = self.client.post("/api/enquiries/", self.body()).data["id"]
+        b = self.client.post("/api/enquiries/", self.body(email="other@example.com")).data["id"]
+        self.client.post(f"/api/enquiries/{a}/convert/", {}, format="json")
+        self.client.post(f"/api/enquiries/{b}/convert/", {}, format="json")
+        self.assertEqual(Client.objects.count(), 2)
+
+    def test_lookup_finds_a_client_by_name_and_email_only(self):
+        enquiry = self.client.post("/api/enquiries/", self.body()).data["id"]
+        self.client.post(f"/api/enquiries/{enquiry}/convert/", {}, format="json")
+        found = self.client.get("/api/clients/lookup/", {"client_name": "rohan mehta", "email": "ROHAN@example.com"})
+        self.assertEqual(found.data["client"]["spouse_name"], "Ishita Rao")
+        self.assertIsNone(self.client.get("/api/clients/lookup/", {"client_name": "Rohan Mehta"}).data["client"])
+        self.assertIsNone(self.client.get("/api/clients/lookup/", {"client_name": "Rohan Mehta",
+                                                                    "email": "x@example.com"}).data["client"])
+
+    def test_creating_a_duplicate_client_directly_is_refused(self):
+        body = {"couple_name": "Rohan & Ishita", "client_name": "Rohan Mehta", "email": "rohan@example.com",
+                "phone": "9812345670"}
+        self.assertEqual(self.client.post("/api/clients/", body).status_code, 201)
+        self.assertEqual(self.client.post("/api/clients/", body).status_code, 400)
+
+    def test_search_finds_an_enquiry_by_client_spouse_or_email(self):
+        self.client.post("/api/enquiries/", self.body())
+        for text in ("Mehta", "Ishita", "rohan@example"):
+            self.assertEqual(self.client.get("/api/enquiries/", {"q": text}).data["count"], 1, text)
+
+    def test_status_can_be_changed_with_a_single_patch(self):
+        enquiry = self.client.post("/api/enquiries/", self.body()).data["id"]
+        res = self.client.patch(f"/api/enquiries/{enquiry}/", {"status": "CONTACTED"}, format="json")
+        self.assertEqual((res.status_code, res.data["status"], res.data["win_chance"]), (200, "CONTACTED", 20))
+        self.assertEqual(self.client.patch(f"/api/enquiries/{enquiry}/", {"status": "LOST"}, format="json").status_code, 400)

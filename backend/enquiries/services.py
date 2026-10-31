@@ -2,8 +2,27 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from clients.models import Client
+from clients.services import find_client
 from enquiries.models import Enquiry, Status
 from weddings.models import Wedding
+
+
+def client_for(enquiry: Enquiry) -> Client:
+    """The client this enquiry belongs to. A client we already have (same client name + email) is reused,
+    so a returning client never gets a second record; otherwise a new one is made."""
+    existing = find_client(enquiry.client_name, enquiry.email)
+    if existing:
+        # fill in anything we did not know about them yet, but never overwrite what is there
+        for field, value in (("spouse_name", enquiry.partner_name), ("spouse_email", enquiry.spouse_email),
+                             ("phone", enquiry.phone), ("city", enquiry.venue_city)):
+            if value and not getattr(existing, field):
+                setattr(existing, field, value)
+        existing.save()
+        return existing
+    return Client.objects.create(
+        couple_name=enquiry.couple_name, client_name=enquiry.client_name, spouse_name=enquiry.partner_name,
+        spouse_email=enquiry.spouse_email, phone=enquiry.phone, email=enquiry.email, city=enquiry.venue_city,
+    )
 
 
 @transaction.atomic
@@ -14,10 +33,7 @@ def convert_to_client(enquiry: Enquiry, create_wedding: bool = False, title: str
     Returns (client, wedding_or_None).
     """
     if enquiry.client_id is None:
-        enquiry.client = Client.objects.create(
-            couple_name=enquiry.couple_name, phone=enquiry.phone, email=enquiry.email,
-            city=enquiry.venue_city,
-        )
+        enquiry.client = client_for(enquiry)
     # a couple who signed up on the customer website can now see their invoices there
     customer = getattr(enquiry, "portal_customer", None)
     if customer is not None and customer.client_id is None:

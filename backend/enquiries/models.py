@@ -37,7 +37,10 @@ STAGE_WIN_CHANCE = {
 class Enquiry(models.Model):
     """A couple's first contact, before they become a client."""
 
-    couple_name = models.CharField(max_length=200)
+    couple_name = models.CharField(max_length=200)  # how the couple is shown, e.g. "Rohan & Ishita"
+    # the person who got in touch (the client) and their spouse; phone and email below are the client's
+    client_name = models.CharField(max_length=200, blank=True)
+    spouse_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
     source = models.CharField(max_length=12, choices=Source.choices, db_index=True)
