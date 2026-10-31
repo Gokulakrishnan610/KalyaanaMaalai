@@ -103,6 +103,7 @@ class MailTemplateTests(OnboardingCase):
             self.assertEqual(res.status_code, 200, name)
             self.assertIn("KalyaanaMaalai", res.data["html"])
             self.assertNotIn("{{", res.data["html"])
+            self.assertIn('href="http://localhost:5174"', res.data["html"])  # every email links to the website
 
     def test_a_sent_email_is_logged_and_delivered(self):
         self.convert(self.phone_enquiry())

@@ -28,7 +28,8 @@ class _Blank(dict):
 def render(template: str, context: dict) -> tuple[str, str, str]:
     """(subject, html, plain text) for a template and its values."""
     subject_text, _ = TEMPLATES[template]
-    values = {"business": BUSINESS, "site_url": settings.CUSTOMER_SITE_URL, **context}
+    values = {"business": BUSINESS, "site_url": settings.CUSTOMER_SITE_URL,
+              "site_url_label": settings.CUSTOMER_SITE_URL.split("://", 1)[-1].rstrip("/"), **context}
     subject = subject_text.format_map(_Blank(values))
     html = render_to_string(f"mailer/{template}.html", {**values, "subject": subject})
     return subject, html, strip_tags(html.split("<!--text-->", 1)[-1]).strip()
