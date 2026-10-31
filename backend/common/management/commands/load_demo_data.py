@@ -6,6 +6,7 @@ from django.db import transaction
 # Run in this order: later files rely on earlier ones. Each file has a load() function.
 DEMO_FILES = [
     "demo_data.people_and_enquiries",
+    "demo_data.starter_wedding",
     "demo_data.weddings_and_tasks",
     "demo_data.vendors_and_quotations",
     "demo_data.payments",
