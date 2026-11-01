@@ -17,12 +17,19 @@ DEMO_FILES = [
 
 
 class Command(BaseCommand):
-    help = "Fill the database with the demo data: staff, vendors, couples (with website logins), agreements and payments. Safe to run more than once."
+    help = "Fill the database with the demo data: staff, vendors, couples (with website logins), agreements and payments. Safe to run more than once. Add --bulk for about 450 more complete weddings."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--bulk", nargs="?", const=450, type=int, default=None, metavar="WEDDINGS",
+                            help="also load (or bring up to date) this many complete weddings; 450 when no number is given")
 
     def handle(self, *args, **options):
         # silenced is outside the transaction, so the "after commit" emails are skipped too
         with silenced(), transaction.atomic():  # demo data should not flood the live feed, the bell or anyone's inbox
             self.load_all()
+            if options["bulk"]:
+                self.stdout.write(import_module("demo_data.bulk_weddings").load(options["bulk"]))
+                self.stdout.write("loaded demo_data.bulk_weddings")
 
     def load_all(self):
         for name in DEMO_FILES:
